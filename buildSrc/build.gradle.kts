@@ -1,0 +1,13 @@
+plugins {
+    `kotlin-dsl`
+}
+
+repositories {
+    gradlePluginPortal()
+}
+
+dependencies {
+    implementation("org.springframework.boot:spring-boot-gradle-plugin:${property("springBootVersion")}")
+    implementation("io.spring.gradle:dependency-management-plugin:${property("springDepManagementVersion")}")
+    implementation("io.freefair.gradle:lombok-plugin:${property("lombokVersion")}")
+}
