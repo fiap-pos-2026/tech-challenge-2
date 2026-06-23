@@ -28,7 +28,6 @@ public class UserController {
 
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(
-            tags = "Users",
             summary = "API to find all users registered.",
             operationId = "find-all"
     )
@@ -38,7 +37,6 @@ public class UserController {
 
     @GetMapping(path = "/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(
-            tags = "Users",
             summary = "API to find a user by it's id.",
             operationId = "find-by-id"
     )
@@ -54,7 +52,6 @@ public class UserController {
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(
-            tags = "Users",
             summary = "API to create a user.",
             description = "Login and e-mail must be unique.",
             operationId = "create-user"
@@ -66,7 +63,6 @@ public class UserController {
 
     @DeleteMapping(path = "/{id}")
     @Operation(
-            tags = "Users",
             summary = "API to delete a user by it's id.",
             operationId = "delete-user"
     )
@@ -87,7 +83,6 @@ public class UserController {
             produces = MediaType.APPLICATION_JSON_VALUE
     )
     @Operation(
-            tags = "Users",
             summary = "API to update a user.",
             description = "Login and e-mail must be unique.",
             operationId = "update-user"

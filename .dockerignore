@@ -1,0 +1,7 @@
+.git
+.gradle
+.idea
+**/build/
+**/.DS_Store
+*.iml
+**/src/main/resources/certs/

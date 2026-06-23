@@ -6,6 +6,7 @@ import br.com.fiap.pos.tech_challenge.core.util.TokenDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/signin")
 @RequiredArgsConstructor
 @Tag(name = "Authentication")
+@SecurityRequirements
 public class AuthController {
 
     private final AuthenticationService service;
@@ -29,7 +31,6 @@ public class AuthController {
             produces = MediaType.APPLICATION_JSON_VALUE
     )
     @Operation(
-            tags = "Authentication",
             summary = "API to sign in into the application.",
             operationId = "sign-in"
     )

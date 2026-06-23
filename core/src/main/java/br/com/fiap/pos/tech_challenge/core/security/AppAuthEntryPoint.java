@@ -12,30 +12,33 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static br.com.fiap.pos.tech_challenge.core.enums.EApplicationError.INVALID_TOKEN;
 import static br.com.fiap.pos.tech_challenge.core.enums.EApplicationError.TOKEN_EXPIRED;
+import static java.util.Objects.requireNonNullElseGet;
 
 @Component
 @Log4j2
 public class AppAuthEntryPoint implements AuthenticationEntryPoint {
 
     private static final String EXPIRED_KEYWORD = "expired";
+    private static final String FORWARDED_FOR_HEADER = "X-Forwarded-For";
 
     @Override
     public void commence(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response,
-                         AuthenticationException exception) throws IOException {
-        log.error(exception.getMessage());
+                         @NonNull AuthenticationException exception) throws IOException {
 
-        AtomicReference<EApplicationError> error = new AtomicReference<>(EApplicationError.TOKEN_NOT_SENT);
+        EApplicationError error = EApplicationError.TOKEN_NOT_SENT;
 
         if (exception instanceof InvalidBearerTokenException e) {
-            error.set(e.getMessage().contains(EXPIRED_KEYWORD) ? TOKEN_EXPIRED : INVALID_TOKEN);
+            error = e.getMessage().contains(EXPIRED_KEYWORD) ? TOKEN_EXPIRED : INVALID_TOKEN;
         }
 
-        EApplicationError handledError = error.get();
+        String clientIp = requireNonNullElseGet(request.getHeader(FORWARDED_FOR_HEADER), request::getRemoteAddr);
 
-        WebUtility.writeError(response, handledError);
+        log.error("[{}] {} from {} - {} | {}", request.getMethod(), request.getRequestURI(),
+                clientIp, error.name(), exception.getMessage());
+
+        WebUtility.writeError(response, error);
     }
 }
