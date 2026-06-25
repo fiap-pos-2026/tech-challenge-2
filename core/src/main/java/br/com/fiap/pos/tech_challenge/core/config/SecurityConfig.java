@@ -2,6 +2,7 @@ package br.com.fiap.pos.tech_challenge.core.config;
 
 import br.com.fiap.pos.tech_challenge.core.security.AppAuthEntryPoint;
 import br.com.fiap.pos.tech_challenge.core.security.JWTAuthorizationFilter;
+import br.com.fiap.pos.tech_challenge.core.util.Translator;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
@@ -43,6 +44,10 @@ public class SecurityConfig {
 
     private final AuthenticationConfiguration configuration;
 
+    private final AppAuthEntryPoint appAuthEntryPoint;
+
+    private final Translator translator;
+
     private static final String[] IGNORED_ROUTES = {
             "/webjars/**",
             "/actuator/**",
@@ -54,7 +59,7 @@ public class SecurityConfig {
     };
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http) {
         return http.csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(it -> it.requestMatchers(IGNORED_ROUTES)
                         .permitAll()
@@ -66,7 +71,7 @@ public class SecurityConfig {
                 .exceptionHandling(Customizer.withDefaults())
                 .oauth2ResourceServer(it -> it
                         .jwt(jwt -> jwt.decoder(jwtDecoder()))
-                        .authenticationEntryPoint(new AppAuthEntryPoint()))
+                        .authenticationEntryPoint(appAuthEntryPoint))
                 .build();
     }
 
@@ -88,7 +93,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public JWTAuthorizationFilter authorizationFilter() throws Exception {
-        return new JWTAuthorizationFilter(configuration.getAuthenticationManager(), details);
+    public JWTAuthorizationFilter authorizationFilter() {
+        return new JWTAuthorizationFilter(configuration.getAuthenticationManager(), details, translator);
     }
 }

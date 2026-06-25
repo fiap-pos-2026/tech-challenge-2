@@ -12,17 +12,17 @@ import java.util.Map;
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public enum EApplicationError {
 
-    INVALID_USERNAME_PASSWORD("Invalid login or password", 1, HttpStatus.BAD_REQUEST),
-    EMAIL_ALREADY_EXISTS("Email already exists", 2, HttpStatus.CONFLICT),
-    LOGIN_ALREADY_EXISTS("Login already exists", 3, HttpStatus.CONFLICT),
-    INVALID_FIELDS("Invalid fields", 4, HttpStatus.BAD_REQUEST),
-    MISSING_FIELDS("Missing fields", 5, HttpStatus.BAD_REQUEST),
-    TOKEN_NOT_SENT("Unauthorized", 6, HttpStatus.UNAUTHORIZED),
-    TOKEN_EXPIRED("Unauthorized - invalid session", 7, HttpStatus.UNAUTHORIZED),
-    INVALID_TOKEN("Unauthorized - invalid token", 8, HttpStatus.UNAUTHORIZED),
-    USER_NOT_FOUND("User not found", 9, HttpStatus.NOT_FOUND),
-    NO_AUTHENTICATION("No active authentication found", 10, HttpStatus.BAD_REQUEST),
-    INVALID_PRINCIPAL("Authentication failed", 11, HttpStatus.BAD_REQUEST);
+    INVALID_USERNAME_PASSWORD("error.invalid_username_password", 1, HttpStatus.BAD_REQUEST),
+    EMAIL_ALREADY_EXISTS("error.email_already_exists", 2, HttpStatus.CONFLICT),
+    LOGIN_ALREADY_EXISTS("error.login_already_exists", 3, HttpStatus.CONFLICT),
+    INVALID_FIELDS("error.invalid_fields", 4, HttpStatus.BAD_REQUEST),
+    MISSING_FIELDS("error.missing_fields", 5, HttpStatus.BAD_REQUEST),
+    TOKEN_NOT_SENT("error.token_not_sent", 6, HttpStatus.UNAUTHORIZED),
+    TOKEN_EXPIRED("error.token_expired", 7, HttpStatus.UNAUTHORIZED),
+    INVALID_TOKEN("error.invalid_token", 8, HttpStatus.UNAUTHORIZED),
+    USER_NOT_FOUND("error.user_not_found", 9, HttpStatus.NOT_FOUND),
+    NO_AUTHENTICATION("error.no_authentication", 10, HttpStatus.BAD_REQUEST),
+    INVALID_PRINCIPAL("error.invalid_principal", 11, HttpStatus.BAD_REQUEST);
 
     private static final Map<Integer, EApplicationError> BY_ERROR_CODE = new HashMap<>();
 
@@ -32,7 +32,7 @@ public enum EApplicationError {
         }
     }
 
-    private final String message;
+    private final String messageKey;
 
     private final Integer errorCode;
 

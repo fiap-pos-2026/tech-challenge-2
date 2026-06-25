@@ -7,17 +7,16 @@ import org.springframework.http.HttpStatus;
 @Getter
 public class CoreException extends RuntimeException {
 
+    private final String messageKey;
+
     private final Integer errorCode;
 
     private final HttpStatus status;
 
     public CoreException(EApplicationError error) {
-        super(error.getMessage());
+        super(error.getMessageKey());
+        this.messageKey = error.getMessageKey();
         this.errorCode = error.getErrorCode();
         this.status = error.getStatus();
-    }
-
-    public ErrorResponse toErrorResponse() {
-        return new ErrorResponse(this.getMessage(), this.getErrorCode());
     }
 }

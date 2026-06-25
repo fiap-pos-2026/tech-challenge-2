@@ -1,6 +1,5 @@
 package br.com.fiap.pos.tech_challenge.core.exception;
 
-import br.com.fiap.pos.tech_challenge.core.enums.EApplicationError;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
@@ -17,9 +16,4 @@ public final class ErrorResponse implements Serializable {
     private final String message;
 
     private final Integer errorCode;
-
-    public ErrorResponse(final EApplicationError error) {
-        this.message = error.getMessage();
-        this.errorCode = error.getErrorCode();
-    }
 }

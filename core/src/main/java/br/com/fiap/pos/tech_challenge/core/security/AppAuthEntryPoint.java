@@ -1,9 +1,11 @@
 package br.com.fiap.pos.tech_challenge.core.security;
 
 import br.com.fiap.pos.tech_challenge.core.enums.EApplicationError;
+import br.com.fiap.pos.tech_challenge.core.util.Translator;
 import br.com.fiap.pos.tech_challenge.core.util.WebUtility;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.jspecify.annotations.NonNull;
 import org.springframework.security.core.AuthenticationException;
@@ -19,10 +21,13 @@ import static java.util.Objects.requireNonNullElseGet;
 
 @Component
 @Log4j2
+@RequiredArgsConstructor
 public class AppAuthEntryPoint implements AuthenticationEntryPoint {
 
     private static final String EXPIRED_KEYWORD = "expired";
     private static final String FORWARDED_FOR_HEADER = "X-Forwarded-For";
+
+    private final Translator translator;
 
     @Override
     public void commence(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response,
@@ -39,6 +44,6 @@ public class AppAuthEntryPoint implements AuthenticationEntryPoint {
         log.error("[{}] {} from {} - {} | {}", request.getMethod(), request.getRequestURI(),
                 clientIp, error.name(), exception.getMessage());
 
-        WebUtility.writeError(response, error);
+        WebUtility.writeError(response, error, translator.translateFromRequest(error.getMessageKey(), request));
     }
 }

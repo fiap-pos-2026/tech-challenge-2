@@ -22,12 +22,12 @@ public class WebUtility {
                 .toUri();
     }
 
-    public static void writeError(HttpServletResponse response, EApplicationError handledError) throws IOException {
+    public static void writeError(HttpServletResponse response, EApplicationError handledError, String message) throws IOException {
         response.setStatus(handledError.getStatus().value());
 
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 
-        ErrorResponse errorResponse = new ErrorResponse(handledError.getMessage(), handledError.getErrorCode());
+        ErrorResponse errorResponse = new ErrorResponse(message, handledError.getErrorCode());
 
         response.getWriter().write(new ObjectMapper().writeValueAsString(errorResponse));
     }
