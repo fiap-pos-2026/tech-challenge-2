@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-5.0.xsd">
+
+    <changeSet id="009-create-quote-product-lines" author="johncgo">
+        <createTable tableName="quote_product_lines">
+            <column name="_id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="_quote_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_product_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_name_snapshot" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_unit_price_snapshot" type="NUMERIC(15,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_quantity" type="NUMERIC(15,4)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_measurement_unit" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_unbudgeted" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="quote_product_lines" indexName="idx_quote_product_lines_quote_id">
+            <column name="_quote_id"/>
+        </createIndex>
+
+        <rollback>
+            <dropTable tableName="quote_product_lines"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="009-fk-quote-product-lines-quote" author="johncgo">
+        <addForeignKeyConstraint
+                constraintName="fk_quote_product_lines_quote_id"
+                baseTableName="quote_product_lines"
+                baseColumnNames="_quote_id"
+                referencedTableName="quotes"
+                referencedColumnNames="_id"
+                onDelete="CASCADE"
+                onUpdate="NO ACTION"/>
+
+        <rollback>
+            <dropForeignKeyConstraint
+                    baseTableName="quote_product_lines"
+                    constraintName="fk_quote_product_lines_quote_id"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="009-fk-quote-product-lines-product" author="johncgo">
+        <addForeignKeyConstraint
+                constraintName="fk_quote_product_lines_product_id"
+                baseTableName="quote_product_lines"
+                baseColumnNames="_product_id"
+                referencedTableName="products"
+                referencedColumnNames="_id"
+                onDelete="RESTRICT"
+                onUpdate="NO ACTION"/>
+
+        <rollback>
+            <dropForeignKeyConstraint
+                    baseTableName="quote_product_lines"
+                    constraintName="fk_quote_product_lines_product_id"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

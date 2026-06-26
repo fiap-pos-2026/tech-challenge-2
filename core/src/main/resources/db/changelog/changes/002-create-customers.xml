@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-5.0.xsd">
+
+    <changeSet id="002-create-customers" author="johncgo">
+        <createTable tableName="customers">
+            <column name="_id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="_uuid" type="UUID">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uq_customers_uuid"/>
+            </column>
+            <column name="_document_type" type="VARCHAR(10)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_document" type="VARCHAR(20)">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uq_customers_document"/>
+            </column>
+            <column name="_name" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_email" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_phone" type="VARCHAR(50)"/>
+            <column name="_created_at" type="TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_version" type="BIGINT"/>
+        </createTable>
+
+        <rollback>
+            <dropTable tableName="customers"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-5.0.xsd">
+
+    <changeSet id="006-create-service-orders" author="johncgo">
+        <createTable tableName="service_orders">
+            <column name="_id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="_uuid" type="UUID">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uq_service_orders_uuid"/>
+            </column>
+            <column name="_status" type="VARCHAR(30)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_customer_complaint" type="TEXT"/>
+            <column name="_customer_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_vehicle_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_approval_expires_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="_created_at" type="TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_updated_at" type="TIMESTAMP"/>
+            <column name="_version" type="BIGINT"/>
+        </createTable>
+
+        <createIndex tableName="service_orders" indexName="idx_service_orders_status">
+            <column name="_status"/>
+        </createIndex>
+        <createIndex tableName="service_orders" indexName="idx_service_orders_customer_id">
+            <column name="_customer_id"/>
+        </createIndex>
+        <createIndex tableName="service_orders" indexName="idx_service_orders_status_expires">
+            <column name="_status"/>
+            <column name="_approval_expires_at"/>
+        </createIndex>
+
+        <rollback>
+            <dropTable tableName="service_orders"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="006-fk-service-orders-customer" author="johncgo">
+        <addForeignKeyConstraint
+                constraintName="fk_service_orders_customer_id"
+                baseTableName="service_orders"
+                baseColumnNames="_customer_id"
+                referencedTableName="customers"
+                referencedColumnNames="_id"
+                onDelete="RESTRICT"
+                onUpdate="NO ACTION"/>
+
+        <rollback>
+            <dropForeignKeyConstraint
+                    baseTableName="service_orders"
+                    constraintName="fk_service_orders_customer_id"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="006-fk-service-orders-vehicle" author="johncgo">
+        <addForeignKeyConstraint
+                constraintName="fk_service_orders_vehicle_id"
+                baseTableName="service_orders"
+                baseColumnNames="_vehicle_id"
+                referencedTableName="vehicles"
+                referencedColumnNames="_id"
+                onDelete="RESTRICT"
+                onUpdate="NO ACTION"/>
+
+        <rollback>
+            <dropForeignKeyConstraint
+                    baseTableName="service_orders"
+                    constraintName="fk_service_orders_vehicle_id"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-5.0.xsd">
+
+    <changeSet id="001-create-users" author="johncgo">
+        <createTable tableName="users">
+            <column name="_id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="_first_name" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_last_name" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_email" type="VARCHAR(255)">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uq_users_email"/>
+            </column>
+            <column name="_birthday" type="DATE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_login" type="VARCHAR(255)">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uq_users_login"/>
+            </column>
+            <column name="_password" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_phone" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_created_at" type="TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_last_login" type="TIMESTAMP"/>
+            <column name="_hash" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_uuid" type="UUID">
+                <constraints unique="true" uniqueConstraintName="uq_users_uuid"/>
+            </column>
+            <column name="_role" type="VARCHAR(20)"/>
+        </createTable>
+
+        <rollback>
+            <dropTable tableName="users"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

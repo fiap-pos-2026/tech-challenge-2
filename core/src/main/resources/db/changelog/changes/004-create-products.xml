@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-5.0.xsd">
+
+    <changeSet id="004-create-products" author="johncgo">
+        <createTable tableName="products">
+            <column name="_id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="_uuid" type="UUID">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uq_products_uuid"/>
+            </column>
+            <column name="_name" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_description" type="VARCHAR(255)"/>
+            <column name="_type" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_measurement_unit" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_unit_price" type="NUMERIC(15,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_available_quantity" type="NUMERIC(15,4)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_created_at" type="TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_updated_at" type="TIMESTAMP"/>
+            <column name="_version" type="BIGINT"/>
+        </createTable>
+
+        <sql>
+            ALTER TABLE products
+                ADD CONSTRAINT ck_products_available_quantity_non_negative
+                CHECK (_available_quantity &gt;= 0);
+        </sql>
+
+        <rollback>
+            <dropTable tableName="products"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-5.0.xsd">
+
+    <changeSet id="011-create-stock-movements" author="johncgo">
+        <createTable tableName="stock_movements">
+            <column name="_id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="_uuid" type="UUID">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uq_stock_movements_uuid"/>
+            </column>
+            <column name="_product_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_service_order_id" type="BIGINT"/>
+            <column name="_type" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_quantity" type="NUMERIC(15,4)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_reference_unit_price" type="NUMERIC(15,2)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_user_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_created_at" type="TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="stock_movements" indexName="idx_stock_movements_product_id">
+            <column name="_product_id"/>
+        </createIndex>
+        <createIndex tableName="stock_movements" indexName="idx_stock_movements_service_order_id">
+            <column name="_service_order_id"/>
+        </createIndex>
+
+        <rollback>
+            <dropTable tableName="stock_movements"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="011-fk-stock-movements-product" author="johncgo">
+        <addForeignKeyConstraint
+                constraintName="fk_stock_movements_product_id"
+                baseTableName="stock_movements"
+                baseColumnNames="_product_id"
+                referencedTableName="products"
+                referencedColumnNames="_id"
+                onDelete="RESTRICT"
+                onUpdate="NO ACTION"/>
+
+        <rollback>
+            <dropForeignKeyConstraint
+                    baseTableName="stock_movements"
+                    constraintName="fk_stock_movements_product_id"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="011-fk-stock-movements-service-order" author="johncgo">
+        <addForeignKeyConstraint
+                constraintName="fk_stock_movements_service_order_id"
+                baseTableName="stock_movements"
+                baseColumnNames="_service_order_id"
+                referencedTableName="service_orders"
+                referencedColumnNames="_id"
+                onDelete="SET NULL"
+                onUpdate="NO ACTION"/>
+
+        <rollback>
+            <dropForeignKeyConstraint
+                    baseTableName="stock_movements"
+                    constraintName="fk_stock_movements_service_order_id"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="011-fk-stock-movements-user" author="johncgo">
+        <addForeignKeyConstraint
+                constraintName="fk_stock_movements_user_id"
+                baseTableName="stock_movements"
+                baseColumnNames="_user_id"
+                referencedTableName="users"
+                referencedColumnNames="_id"
+                onDelete="RESTRICT"
+                onUpdate="NO ACTION"/>
+
+        <rollback>
+            <dropForeignKeyConstraint
+                    baseTableName="stock_movements"
+                    constraintName="fk_stock_movements_user_id"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

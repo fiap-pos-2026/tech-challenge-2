@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-5.0.xsd">
+
+    <changeSet id="005-create-vehicles" author="johncgo">
+        <createTable tableName="vehicles">
+            <column name="_id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="_uuid" type="UUID">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uq_vehicles_uuid"/>
+            </column>
+            <column name="_license_plate" type="VARCHAR(10)">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uq_vehicles_license_plate"/>
+            </column>
+            <column name="_make" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_model" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_year" type="INT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_customer_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_created_at" type="TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="vehicles" indexName="idx_vehicles_customer_id">
+            <column name="_customer_id"/>
+        </createIndex>
+
+        <rollback>
+            <dropTable tableName="vehicles"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="005-fk-vehicles-customer" author="johncgo">
+        <addForeignKeyConstraint
+                constraintName="fk_vehicles_customer_id"
+                baseTableName="vehicles"
+                baseColumnNames="_customer_id"
+                referencedTableName="customers"
+                referencedColumnNames="_id"
+                onDelete="RESTRICT"
+                onUpdate="NO ACTION"/>
+
+        <rollback>
+            <dropForeignKeyConstraint
+                    baseTableName="vehicles"
+                    constraintName="fk_vehicles_customer_id"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

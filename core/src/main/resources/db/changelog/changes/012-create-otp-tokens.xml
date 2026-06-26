@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-5.0.xsd">
+
+    <changeSet id="012-create-otp-tokens" author="johncgo">
+        <createTable tableName="otp_tokens">
+            <column name="_id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="_uuid" type="UUID">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uq_otp_tokens_uuid"/>
+            </column>
+            <column name="_service_order_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_token_hash" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_expires_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_used" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_invalid_attempts" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_invalidated_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="_created_at" type="TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="otp_tokens" indexName="idx_otp_tokens_service_order_id">
+            <column name="_service_order_id"/>
+        </createIndex>
+
+        <rollback>
+            <dropTable tableName="otp_tokens"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="012-fk-otp-tokens-service-order" author="johncgo">
+        <addForeignKeyConstraint
+                constraintName="fk_otp_tokens_service_order_id"
+                baseTableName="otp_tokens"
+                baseColumnNames="_service_order_id"
+                referencedTableName="service_orders"
+                referencedColumnNames="_id"
+                onDelete="CASCADE"
+                onUpdate="NO ACTION"/>
+
+        <rollback>
+            <dropForeignKeyConstraint
+                    baseTableName="otp_tokens"
+                    constraintName="fk_otp_tokens_service_order_id"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

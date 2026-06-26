@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-5.0.xsd">
+
+    <changeSet id="014-create-security-audit-logs" author="johncgo">
+        <createTable tableName="security_audit_logs">
+            <column name="_id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="_uuid" type="UUID">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uq_security_audit_logs_uuid"/>
+            </column>
+            <column name="_event_timestamp" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_event_type" type="VARCHAR(40)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_user_id" type="BIGINT"/>
+            <column name="_attempt_identifier" type="VARCHAR(255)"/>
+            <column name="_result" type="VARCHAR(10)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_details" type="TEXT"/>
+            <column name="_created_at" type="TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="security_audit_logs" indexName="idx_security_audit_logs_user_id">
+            <column name="_user_id"/>
+        </createIndex>
+        <createIndex tableName="security_audit_logs" indexName="idx_security_audit_logs_event_type">
+            <column name="_event_type"/>
+        </createIndex>
+
+        <rollback>
+            <dropTable tableName="security_audit_logs"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="014-fk-security-audit-logs-user" author="johncgo">
+        <addForeignKeyConstraint
+                constraintName="fk_security_audit_logs_user_id"
+                baseTableName="security_audit_logs"
+                baseColumnNames="_user_id"
+                referencedTableName="users"
+                referencedColumnNames="_id"
+                onDelete="SET NULL"
+                onUpdate="NO ACTION"/>
+
+        <rollback>
+            <dropForeignKeyConstraint
+                    baseTableName="security_audit_logs"
+                    constraintName="fk_security_audit_logs_user_id"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

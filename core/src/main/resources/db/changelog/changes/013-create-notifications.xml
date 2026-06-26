@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-5.0.xsd">
+
+    <changeSet id="013-create-notifications" author="johncgo">
+        <createTable tableName="notifications">
+            <column name="_id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="_uuid" type="UUID">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uq_notifications_uuid"/>
+            </column>
+            <column name="_user_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_type" type="VARCHAR(40)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_message" type="TEXT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_service_order_ref_id" type="BIGINT"/>
+            <column name="_read" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_read_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="_created_at" type="TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="notifications" indexName="idx_notifications_user_id">
+            <column name="_user_id"/>
+        </createIndex>
+
+        <rollback>
+            <dropTable tableName="notifications"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="013-fk-notifications-user" author="johncgo">
+        <addForeignKeyConstraint
+                constraintName="fk_notifications_user_id"
+                baseTableName="notifications"
+                baseColumnNames="_user_id"
+                referencedTableName="users"
+                referencedColumnNames="_id"
+                onDelete="CASCADE"
+                onUpdate="NO ACTION"/>
+
+        <rollback>
+            <dropForeignKeyConstraint
+                    baseTableName="notifications"
+                    constraintName="fk_notifications_user_id"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="013-fk-notifications-service-order-ref" author="johncgo">
+        <addForeignKeyConstraint
+                constraintName="fk_notifications_service_order_ref_id"
+                baseTableName="notifications"
+                baseColumnNames="_service_order_ref_id"
+                referencedTableName="service_orders"
+                referencedColumnNames="_id"
+                onDelete="SET NULL"
+                onUpdate="NO ACTION"/>
+
+        <rollback>
+            <dropForeignKeyConstraint
+                    baseTableName="notifications"
+                    constraintName="fk_notifications_service_order_ref_id"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

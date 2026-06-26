@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-5.0.xsd">
+
+    <changeSet id="010-create-rework-cycles" author="johncgo">
+        <createTable tableName="rework_cycles">
+            <column name="_id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="_uuid" type="UUID">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uq_rework_cycles_uuid"/>
+            </column>
+            <column name="_service_order_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="_rejection_reason" type="TEXT"/>
+            <column name="_created_at" type="TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <createIndex tableName="rework_cycles" indexName="idx_rework_cycles_service_order_id">
+            <column name="_service_order_id"/>
+        </createIndex>
+
+        <rollback>
+            <dropTable tableName="rework_cycles"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="010-fk-rework-cycles-service-order" author="johncgo">
+        <addForeignKeyConstraint
+                constraintName="fk_rework_cycles_service_order_id"
+                baseTableName="rework_cycles"
+                baseColumnNames="_service_order_id"
+                referencedTableName="service_orders"
+                referencedColumnNames="_id"
+                onDelete="CASCADE"
+                onUpdate="NO ACTION"/>
+
+        <rollback>
+            <dropForeignKeyConstraint
+                    baseTableName="rework_cycles"
+                    constraintName="fk_rework_cycles_service_order_id"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

@@ -1,5 +1,6 @@
 package br.com.fiap.pos.tech_challenge.core.domain;
 
+import br.com.fiap.pos.tech_challenge.core.enums.UserRole;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -56,6 +57,13 @@ public class User implements Serializable {
     @Column(name = "_hash", nullable = false)
     private String hash;
 
+    @Column(name = "_uuid", unique = true)
+    private UUID uuid;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "_role")
+    private UserRole role;
+
     public User(User that) {
         this.id = that.id;
         this.firstName = that.firstName;
@@ -68,6 +76,8 @@ public class User implements Serializable {
         this.createdAt = that.createdAt;
         this.lastLogin = that.lastLogin;
         this.hash = that.hash;
+        this.uuid = that.uuid;
+        this.role = that.role;
     }
 
     @Override
@@ -97,6 +107,9 @@ public class User implements Serializable {
         }
         if (this.hash == null) {
             this.hash = UUID.randomUUID().toString();
+        }
+        if (this.uuid == null) {
+            this.uuid = UUID.randomUUID();
         }
     }
 }
