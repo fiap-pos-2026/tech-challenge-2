@@ -37,6 +37,8 @@ public class TokenUtility {
                 .expiresAt(currentInstant.plus(expiryTime))
                 .subject(impl.getLogin())
                 .claim("id", impl.getId())
+                .claim("uuid", impl.getUuid() != null ? impl.getUuid().toString() : null)
+                .claim("role", impl.getRole() != null ? impl.getRole().name() : null)
                 .claim("first_name", impl.getFirstName())
                 .claim("last_name", impl.getLastName())
                 .claim("e-mail", impl.getEmail())

@@ -1,6 +1,7 @@
 package br.com.fiap.pos.tech_challenge.core.config;
 
 import br.com.fiap.pos.tech_challenge.core.security.AppAuthEntryPoint;
+import br.com.fiap.pos.tech_challenge.core.security.AuditLogFilter;
 import br.com.fiap.pos.tech_challenge.core.security.JWTAuthorizationFilter;
 import br.com.fiap.pos.tech_challenge.core.util.Translator;
 import com.nimbusds.jose.jwk.JWKSet;
@@ -13,6 +14,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -24,12 +26,14 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -46,6 +50,8 @@ public class SecurityConfig {
 
     private final AppAuthEntryPoint appAuthEntryPoint;
 
+    private final AuditLogFilter auditLogFilter;
+
     private final Translator translator;
 
     private static final String[] IGNORED_ROUTES = {
@@ -59,16 +65,24 @@ public class SecurityConfig {
             "/eureka/**"
     };
 
+    private static final String[] PUBLIC_OTP_ROUTES = {
+            "/api/service-orders/*/status",
+            "/api/service-orders/*/approval",
+            "/api/service-orders/*/delivery/accept",
+            "/api/service-orders/*/delivery/reject"
+    };
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) {
         return http.csrf(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(it -> it.requestMatchers(IGNORED_ROUTES)
-                        .permitAll()
-                        .anyRequest()
-                        .authenticated())
+                .authorizeHttpRequests(it -> it
+                        .requestMatchers(IGNORED_ROUTES).permitAll()
+                        .requestMatchers(PUBLIC_OTP_ROUTES).permitAll()
+                        .anyRequest().authenticated())
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .addFilter(authorizationFilter())
+                .addFilterAfter(auditLogFilter, UsernamePasswordAuthenticationFilter.class)
                 .exceptionHandling(Customizer.withDefaults())
                 .oauth2ResourceServer(it -> it
                         .jwt(jwt -> jwt.decoder(jwtDecoder()))

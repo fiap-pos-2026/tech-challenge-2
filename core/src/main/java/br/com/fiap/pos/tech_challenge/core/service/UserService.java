@@ -100,6 +100,12 @@ public class UserService implements UserDetailsService {
     }
 
     @Transactional(readOnly = true)
+    public User findByLogin(String login) {
+        return repository.findByLogin(login)
+                .orElseThrow(() -> new CoreException(EApplicationError.USER_NOT_FOUND));
+    }
+
+    @Transactional(readOnly = true)
     public UserDTO getLoggedUser() {
         UserDetailsImpl loggedUser = AuthUtility.getLoggedUser();
 

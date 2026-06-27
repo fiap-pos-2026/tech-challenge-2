@@ -16,6 +16,13 @@ services:
       timeout: 5s
       retries: 5
 
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: tech-challenge-mailpit
+    ports:
+      - "8025:8025"   # web UI — acesse http://localhost:8025 para ver os e-mails
+      - "1025:1025"   # SMTP
+
   core:
     build:
       context: .
@@ -32,6 +39,8 @@ services:
       JDBC_PASSWORD: techdevpw
       JWT_PUBLIC_KEY: file:/run/certs/dev-public.pem
       JWT_PRIVATE_KEY: file:/run/certs/dev-private.pem
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
     volumes:
       - ./core/src/main/resources/certs:/run/certs:ro
     healthcheck:
@@ -43,6 +52,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      mailpit:
+        condition: service_started
 
 volumes:
   postgres-data:

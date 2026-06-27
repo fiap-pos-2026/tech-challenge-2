@@ -1,18 +1,18 @@
 package br.com.fiap.pos.tech_challenge.core.repository;
 
+import br.com.fiap.pos.tech_challenge.core.domain.ReworkCycle;
 import br.com.fiap.pos.tech_challenge.core.domain.ServiceOrder;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import java.util.Optional;
-import java.util.UUID;
+import java.util.List;
 
 /**
  * @author johncgo
- * @since 2026-06-24
+ * @since 2026-06-26
  */
 @Repository
-public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long> {
+public interface ReworkCycleRepository extends JpaRepository<ReworkCycle, Long> {
 
-    Optional<ServiceOrder> findByUuid(UUID uuid);
+    List<ReworkCycle> findByServiceOrder(ServiceOrder serviceOrder);
 }

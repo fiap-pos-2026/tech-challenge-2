@@ -61,6 +61,9 @@ public class Product {
     @Column(name = "_updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "_returnable", nullable = false)
+    private boolean returnable = false;
+
     @Version
     @Column(name = "_version")
     private Long version;

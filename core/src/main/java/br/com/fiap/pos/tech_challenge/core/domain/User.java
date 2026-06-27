@@ -64,6 +64,15 @@ public class User implements Serializable {
     @Column(name = "_role")
     private UserRole role;
 
+    @Column(name = "_active", nullable = false)
+    private boolean active = true;
+
+    @Column(name = "_tentativas_login_falha", nullable = false)
+    private int loginFailedAttempts = 0;
+
+    @Column(name = "_bloqueado_ate")
+    private LocalDateTime lockedUntil;
+
     public User(User that) {
         this.id = that.id;
         this.firstName = that.firstName;
@@ -78,6 +87,9 @@ public class User implements Serializable {
         this.hash = that.hash;
         this.uuid = that.uuid;
         this.role = that.role;
+        this.active = that.active;
+        this.loginFailedAttempts = that.loginFailedAttempts;
+        this.lockedUntil = that.lockedUntil;
     }
 
     @Override

@@ -59,6 +59,13 @@ public class JWTAuthorizationFilter extends BasicAuthenticationFilter {
 
             tokenUtility.validate(token, (UserDetailsImpl) details);
 
+            UserDetailsImpl impl = (UserDetailsImpl) details;
+            if (!impl.isActive()) {
+                EApplicationError error = EApplicationError.ACCOUNT_INACTIVE;
+                WebUtility.writeError(response, error, translator.translateFromRequest(error.getMessageKey(), request));
+                return;
+            }
+
             var authentication = new UsernamePasswordAuthenticationToken(details, null, details.getAuthorities());
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
