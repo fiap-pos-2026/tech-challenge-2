@@ -25,6 +25,7 @@ tasks.withType<JavaCompile> {
 }
 
 tasks.processResources {
+    filteringCharset = "UTF-8"
     filter<ReplaceTokens>("tokens" to mapOf(
         "version" to project.version,
         "gradle_version" to gradle.gradleVersion

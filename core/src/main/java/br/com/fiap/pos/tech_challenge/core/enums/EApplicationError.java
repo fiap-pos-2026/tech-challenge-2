@@ -30,18 +30,19 @@ public enum EApplicationError {
     SERVICE_ORDER_NOT_FOUND("error.service_order_not_found", 16, HttpStatus.NOT_FOUND),
     QUOTE_NOT_FOUND("error.quote_not_found", 17, HttpStatus.NOT_FOUND),
     PRODUCT_NOT_FOUND("error.product_not_found", 18, HttpStatus.NOT_FOUND),
-    INSUFFICIENT_STOCK("error.insufficient_stock", 19, HttpStatus.UNPROCESSABLE_ENTITY),
+    INSUFFICIENT_STOCK("error.insufficient_stock", 19, HttpStatus.UNPROCESSABLE_CONTENT),
     INVALID_STATUS_TRANSITION("error.invalid_status_transition", 20, HttpStatus.CONFLICT),
     DUPLICATE_DOCUMENT("error.duplicate_document", 21, HttpStatus.CONFLICT),
     DUPLICATE_LICENSE_PLATE("error.duplicate_license_plate", 22, HttpStatus.CONFLICT),
-    INVALID_OTP_SUBMISSION("error.otp_invalid", 23, HttpStatus.UNPROCESSABLE_ENTITY),
+    INVALID_OTP_SUBMISSION("error.otp_invalid", 23, HttpStatus.UNPROCESSABLE_CONTENT),
     OTP_LIMIT_EXCEEDED("error.otp_limit_exceeded", 24, HttpStatus.TOO_MANY_REQUESTS),
     ACCOUNT_LOCKED("error.account_locked", 25, HttpStatus.LOCKED),
     ACCOUNT_INACTIVE("error.account_inactive", 26, HttpStatus.UNAUTHORIZED),
-    RETURN_NOT_ALLOWED("error.return_not_allowed", 27, HttpStatus.UNPROCESSABLE_ENTITY),
+    RETURN_NOT_ALLOWED("error.return_not_allowed", 27, HttpStatus.UNPROCESSABLE_CONTENT),
     RESOURCE_IN_USE("error.resource_in_use", 28, HttpStatus.CONFLICT),
     OPTIMISTIC_LOCK_CONFLICT("error.optimistic_lock_conflict", 29, HttpStatus.CONFLICT),
-    NOTIFICATION_NOT_FOUND("error.notification_not_found", 30, HttpStatus.NOT_FOUND);
+    NOTIFICATION_NOT_FOUND("error.notification_not_found", 30, HttpStatus.NOT_FOUND),
+    VEHICLE_NOT_OWNED_BY_CUSTOMER("error.vehicle_not_owned_by_customer", 31, HttpStatus.UNPROCESSABLE_CONTENT);
 
     private static final Map<Integer, EApplicationError> BY_ERROR_CODE = new HashMap<>();
 

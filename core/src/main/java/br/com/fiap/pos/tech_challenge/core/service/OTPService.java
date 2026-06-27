@@ -3,6 +3,7 @@ package br.com.fiap.pos.tech_challenge.core.service;
 import br.com.fiap.pos.tech_challenge.core.domain.OTPToken;
 import br.com.fiap.pos.tech_challenge.core.domain.ServiceOrder;
 import br.com.fiap.pos.tech_challenge.core.enums.NotificationType;
+import br.com.fiap.pos.tech_challenge.core.enums.ServiceOrderStatus;
 import br.com.fiap.pos.tech_challenge.core.enums.UserRole;
 import br.com.fiap.pos.tech_challenge.core.exception.InvalidOTPTokenException;
 import br.com.fiap.pos.tech_challenge.core.repository.OTPTokenRepository;
@@ -41,13 +42,17 @@ public class OTPService {
     private static final int OTP_EXPIRY_HOURS = 1;
 
     private final OTPTokenRepository otpTokenRepository;
+
     private final ServiceOrderRepository serviceOrderRepository;
+
     private final NotificationService notificationService;
+
+    private final SecureRandom random = new SecureRandom();
 
     @Setter(onMethod_ = @Autowired(required = false))
     private JavaMailSender mailSender;
 
-    @Value("${spring.mail.username:noreply@thejavagarage.com}")
+    @Value("${spring.mail.username:noreply@tech.com}")
     private String fromAddress;
 
     @Transactional
@@ -55,7 +60,7 @@ public class OTPService {
         invalidateByServiceOrder(serviceOrder);
 
         byte[] rawBytes = new byte[32];
-        new SecureRandom().nextBytes(rawBytes);
+        random.nextBytes(rawBytes);
         String rawToken = HexFormat.of().formatHex(rawBytes);
         String tokenHash = sha256Hex(rawToken);
 
@@ -131,9 +136,14 @@ public class OTPService {
             SimpleMailMessage message = new SimpleMailMessage();
             message.setFrom(fromAddress);
             message.setTo(serviceOrder.getCustomer().getEmail());
-            message.setSubject("Token de aprovação de orçamento");
-            message.setText("Seu token de confirmação é: " + rawToken +
-                    "\nEste token expira em " + OTP_EXPIRY_HOURS + " hora(s).");
+            boolean isDelivery = serviceOrder.getStatus() == ServiceOrderStatus.COMPLETED;
+            message.setSubject(isDelivery
+                    ? "Token de confirmação de entrega"
+                    : "Token de aprovação de orçamento");
+            message.setText((isDelivery
+                    ? "Seu token para confirmar ou recusar a entrega do veículo é: "
+                    : "Seu token de confirmação é: ")
+                    + rawToken + "\nEste token expira em " + OTP_EXPIRY_HOURS + " hora(s).");
             mailSender.send(message);
         } catch (MailException e) {
             log.error("Falha ao enviar e-mail OTP para OS {}: {}", serviceOrder.getUuid(), e.getMessage());

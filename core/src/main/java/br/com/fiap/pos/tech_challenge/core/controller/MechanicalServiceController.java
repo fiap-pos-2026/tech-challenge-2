@@ -2,6 +2,7 @@ package br.com.fiap.pos.tech_challenge.core.controller;
 
 import br.com.fiap.pos.tech_challenge.core.controller.dto.CreateServiceRequest;
 import br.com.fiap.pos.tech_challenge.core.controller.dto.MechanicalServiceResponse;
+import br.com.fiap.pos.tech_challenge.core.controller.dto.ServiceAvgDurationResponse;
 import br.com.fiap.pos.tech_challenge.core.service.MechanicalServiceService;
 import br.com.fiap.pos.tech_challenge.core.util.WebUtility;
 import io.swagger.v3.oas.annotations.Operation;
@@ -19,6 +20,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -43,6 +45,7 @@ public class MechanicalServiceController {
 
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "List all mechanical services (paginated)", operationId = "list-mechanical-services")
+    @PreAuthorize("hasAnyRole('ATTENDANT', 'MECHANIC')")
     public ResponseEntity<Page<MechanicalServiceResponse>> findAll(
             @PageableDefault(size = 20, sort = "name") Pageable pageable) {
         return ResponseEntity.ok(service.findAll(pageable));
@@ -56,6 +59,7 @@ public class MechanicalServiceController {
             required = true,
             content = @Content(schema = @Schema(implementation = UUID.class))
     )
+    @PreAuthorize("hasAnyRole('ATTENDANT', 'MECHANIC')")
     public ResponseEntity<MechanicalServiceResponse> findByUuid(@PathVariable UUID uuid) {
         return ResponseEntity.ok(service.findByUuid(uuid));
     }
@@ -68,9 +72,18 @@ public class MechanicalServiceController {
             required = true,
             content = @Content(schema = @Schema(implementation = UUID.class))
     )
+    @PreAuthorize("hasRole('ATTENDANT')")
     public ResponseEntity<MechanicalServiceResponse> update(@PathVariable UUID uuid,
                                                             @RequestBody @Valid CreateServiceRequest request) {
         return ResponseEntity.ok(service.update(uuid, request));
+    }
+
+    @GetMapping(path = "/avg-duration", produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "Get average estimated execution time per service type (completed orders)",
+            operationId = "get-avg-duration-by-service")
+    @PreAuthorize("hasAnyRole('ATTENDANT', 'MECHANIC')")
+    public ResponseEntity<List<ServiceAvgDurationResponse>> avgDuration() {
+        return ResponseEntity.ok(service.findAvgDurations());
     }
 
     @DeleteMapping(path = "/{uuid}")
@@ -82,6 +95,7 @@ public class MechanicalServiceController {
             required = true,
             content = @Content(schema = @Schema(implementation = UUID.class))
     )
+    @PreAuthorize("hasRole('ATTENDANT')")
     public ResponseEntity<Void> delete(@PathVariable UUID uuid) {
         service.delete(uuid);
         return ResponseEntity.noContent().build();

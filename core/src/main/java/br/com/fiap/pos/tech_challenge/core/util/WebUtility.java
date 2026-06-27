@@ -5,7 +5,6 @@ import br.com.fiap.pos.tech_challenge.core.exception.ErrorResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.experimental.UtilityClass;
-import org.springframework.http.MediaType;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.io.IOException;
@@ -24,11 +23,12 @@ public class WebUtility {
 
     public static void writeError(HttpServletResponse response, EApplicationError handledError, String message) throws IOException {
         response.setStatus(handledError.getStatus().value());
-
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setContentType("application/json;charset=UTF-8");
 
         ErrorResponse errorResponse = new ErrorResponse(message, handledError.getErrorCode());
 
-        response.getWriter().write(new ObjectMapper().writeValueAsString(errorResponse));
+        byte[] bytes = new ObjectMapper().writeValueAsBytes(errorResponse);
+        response.setContentLength(bytes.length);
+        response.getOutputStream().write(bytes);
     }
 }

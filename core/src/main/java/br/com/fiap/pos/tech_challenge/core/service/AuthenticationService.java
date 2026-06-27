@@ -91,14 +91,12 @@ public class AuthenticationService {
 
             return token;
 
-        } catch (AccountInactiveException | AccountLockedException e) {
-            throw e;
-        } catch (BadCredentialsException e) {
-            handleFailedAttempt(dto.getLogin(), user);
-            throw new CoreException(EApplicationError.INVALID_USERNAME_PASSWORD);
         } catch (CoreException e) {
             throw e;
-        } catch (Exception e) {
+        } catch (BadCredentialsException _) {
+            handleFailedAttempt(dto.getLogin(), user);
+            throw new CoreException(EApplicationError.INVALID_USERNAME_PASSWORD);
+        }  catch (Exception e) {
             log.error(e.getMessage());
             handleFailedAttempt(dto.getLogin(), user);
             throw new CoreException(EApplicationError.INVALID_USERNAME_PASSWORD);
@@ -134,6 +132,6 @@ public class AuthenticationService {
             auditLogService.register(AuditEventType.LOGIN_FAILED, user, login, "401", "Tentativa " + attempts);
         }
 
-        userRepository.save(user);
+        userService.saveLoginState(user);
     }
 }

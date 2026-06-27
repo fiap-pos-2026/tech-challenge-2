@@ -2,6 +2,7 @@ package br.com.fiap.pos.tech_challenge.core.service;
 
 import br.com.fiap.pos.tech_challenge.core.controller.dto.CreateServiceRequest;
 import br.com.fiap.pos.tech_challenge.core.controller.dto.MechanicalServiceResponse;
+import br.com.fiap.pos.tech_challenge.core.controller.dto.ServiceAvgDurationResponse;
 import br.com.fiap.pos.tech_challenge.core.domain.MechanicalService;
 import br.com.fiap.pos.tech_challenge.core.enums.EApplicationError;
 import br.com.fiap.pos.tech_challenge.core.enums.ServiceOrderStatus;
@@ -33,6 +34,9 @@ public class MechanicalServiceService {
     private static final List<ServiceOrderStatus> ACTIVE_STATUSES = Arrays.stream(ServiceOrderStatus.values())
             .filter(s -> !s.isTerminal())
             .toList();
+
+    private static final List<ServiceOrderStatus> COMPLETED_STATUSES =
+            List.of(ServiceOrderStatus.COMPLETED, ServiceOrderStatus.DELIVERED);
 
     @Transactional
     public MechanicalServiceResponse create(CreateServiceRequest request) {
@@ -70,5 +74,10 @@ public class MechanicalServiceService {
         return repository.findByUuid(uuid)
                 .map(mapper::toResponse)
                 .orElseThrow(MechanicalServiceNotFoundException::new);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ServiceAvgDurationResponse> findAvgDurations() {
+        return repository.findAvgDurationByService(COMPLETED_STATUSES);
     }
 }

@@ -8,5 +8,6 @@ public enum MovementType {
     DEBIT,
     CREDIT,
     REPLENISHMENT,
-    COMPENSATION
+    COMPENSATION,
+    MANUAL_ADJUSTMENT
 }

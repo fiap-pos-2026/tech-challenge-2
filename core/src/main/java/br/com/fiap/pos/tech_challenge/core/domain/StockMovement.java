@@ -55,6 +55,9 @@ public class StockMovement {
     @JoinColumn(name = "_user_id", nullable = false, updatable = false)
     private User user;
 
+    @Column(name = "_notes", columnDefinition = "TEXT", updatable = false)
+    private String notes;
+
     @Column(name = "_created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

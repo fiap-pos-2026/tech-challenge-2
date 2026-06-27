@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import org.hibernate.proxy.HibernateProxy;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.UUID;
@@ -37,6 +38,12 @@ public class ReworkCycle {
 
     @Column(name = "_rejection_reason", columnDefinition = "TEXT", updatable = false)
     private String rejectionReason;
+
+    @Column(name = "_estimated_duration_minutes", updatable = false)
+    private Integer estimatedDurationMinutes;
+
+    @Column(name = "_estimated_internal_cost", precision = 15, scale = 2, updatable = false)
+    private BigDecimal estimatedInternalCost;
 
     @Column(name = "_created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

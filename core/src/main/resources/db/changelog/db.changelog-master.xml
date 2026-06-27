@@ -21,5 +21,7 @@
     <include file="changes/014-create-security-audit-logs.xml"      relativeToChangelogFile="true"/>
     <include file="changes/016-add-security-fields-to-users.xml"   relativeToChangelogFile="true"/>
     <include file="changes/017-add-returnable-to-products.xml"     relativeToChangelogFile="true"/>
+    <include file="changes/018-add-cost-to-rework-cycles.xml"      relativeToChangelogFile="true"/>
+    <include file="changes/019-add-notes-to-stock-movements.xml"   relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

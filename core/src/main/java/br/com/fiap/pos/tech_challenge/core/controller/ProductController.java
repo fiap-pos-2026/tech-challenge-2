@@ -43,7 +43,7 @@ public class ProductController {
 
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "List all products (paginated)", operationId = "list-products")
-    @PreAuthorize("hasRole('ATTENDANT')")
+    @PreAuthorize("hasAnyRole('ATTENDANT', 'MECHANIC')")
     public ResponseEntity<Page<ProductResponse>> findAll(
             @PageableDefault(size = 20, sort = "name") Pageable pageable) {
         return ResponseEntity.ok(service.findAll(pageable));
@@ -57,7 +57,7 @@ public class ProductController {
             required = true,
             content = @Content(schema = @Schema(implementation = UUID.class))
     )
-    @PreAuthorize("hasRole('ATTENDANT')")
+    @PreAuthorize("hasAnyRole('ATTENDANT', 'MECHANIC')")
     public ResponseEntity<ProductResponse> findByUuid(@PathVariable UUID uuid) {
         return ResponseEntity.ok(service.findByUuid(uuid));
     }

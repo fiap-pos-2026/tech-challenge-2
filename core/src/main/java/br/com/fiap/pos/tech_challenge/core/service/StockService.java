@@ -97,6 +97,21 @@ public class StockService {
         return stockMovementRepository.findAll(pageable);
     }
 
+    @Transactional
+    public void registerManualAdjustment(UUID productUuid, BigDecimal quantity, String reason, User user) {
+        Product product = productRepository.findByUuid(productUuid)
+                .orElseThrow(ProductNotFoundException::new);
+
+        StockMovement movement = new StockMovement();
+        movement.setProduct(product);
+        movement.setType(MovementType.MANUAL_ADJUSTMENT);
+        movement.setQuantity(quantity);
+        movement.setReferenceUnitPrice(product.getUnitPrice());
+        movement.setNotes(reason);
+        movement.setUser(user);
+        stockMovementRepository.save(movement);
+    }
+
     private void recordMovement(Product product, ServiceOrder serviceOrder, User user,
                                 MovementType type, BigDecimal quantity) {
         StockMovement movement = new StockMovement();

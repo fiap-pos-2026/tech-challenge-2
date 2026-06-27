@@ -17,6 +17,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -47,6 +48,11 @@ public class UserService implements UserDetailsService {
         return repository.findById(id)
                 .map(mapper::toDTO)
                 .orElseThrow(() -> new CoreException(EApplicationError.USER_NOT_FOUND));
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void saveLoginState(User user) {
+        repository.save(user);
     }
 
     @Transactional

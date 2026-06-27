@@ -15,6 +15,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -46,6 +47,15 @@ public class NotificationService {
     @Transactional
     public void publishToRole(UserRole role, NotificationType type, String message, ServiceOrder serviceOrderRef) {
         userRepository.findByRole(role).forEach(user -> publish(user, type, message, serviceOrderRef));
+    }
+
+    /**
+     * Notifica atendentes em transação própria para garantir persistência mesmo que a
+     * transação chamadora seja revertida (ex: estoque insuficiente).
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void publishInsufficientStockNotification(String message, ServiceOrder serviceOrderRef) {
+        publishToRole(UserRole.ATTENDANT, NotificationType.INSUFFICIENT_STOCK, message, serviceOrderRef);
     }
 
     @Transactional(readOnly = true)

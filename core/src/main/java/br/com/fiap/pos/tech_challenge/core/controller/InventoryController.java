@@ -1,5 +1,6 @@
 package br.com.fiap.pos.tech_challenge.core.controller;
 
+import br.com.fiap.pos.tech_challenge.core.controller.dto.ManualAdjustmentRequest;
 import br.com.fiap.pos.tech_challenge.core.controller.dto.ReplenishmentRequest;
 import br.com.fiap.pos.tech_challenge.core.controller.dto.StockMovementResponse;
 import br.com.fiap.pos.tech_challenge.core.domain.StockMovement;
@@ -10,6 +11,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -52,6 +55,24 @@ public class InventoryController {
                                           @RequestBody @Valid ReplenishmentRequest request,
                                           @AuthenticationPrincipal UserDetailsImpl principal) {
         stockService.replenish(uuid, request.quantity(), principal);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping(path = "/manual-adjustment",
+            consumes = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(
+            summary = "Register a manual adjustment for consumed non-returnable items (audit only — no stock change)",
+            operationId = "register-manual-adjustment")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Adjustment recorded"),
+            @ApiResponse(responseCode = "404", description = "Product not found")
+    })
+    @PreAuthorize("hasRole('ATTENDANT')")
+    public ResponseEntity<Void> registerManualAdjustment(
+            @RequestBody @Valid ManualAdjustmentRequest request,
+            @AuthenticationPrincipal UserDetailsImpl principal) {
+        stockService.registerManualAdjustment(
+                request.productUuid(), request.quantity(), request.reason(), principal);
         return ResponseEntity.noContent().build();
     }
 
