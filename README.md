@@ -125,8 +125,6 @@ Os testes de integração sobem um PostgreSQL via Testcontainers — certifique-
 RECEIVED → IN_DIAGNOSIS → AWAITING_APPROVAL → IN_PROGRESS → COMPLETED → DELIVERED
 ```
 
-Ver contratos completos em `specs/001-atendimento-execucao-oficina/contracts/`.
-
 ---
 
 ## Justificativa da escolha do banco de dados
