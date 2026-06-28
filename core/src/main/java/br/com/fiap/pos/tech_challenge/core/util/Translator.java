@@ -23,6 +23,10 @@ public class Translator {
         return messageSource.getMessage(key, args, LocaleContextHolder.getLocale());
     }
 
+    public String translateOrDefault(String key, String defaultMessage) {
+        return messageSource.getMessage(key, null, defaultMessage, LocaleContextHolder.getLocale());
+    }
+
     public String translateFromRequest(String key, HttpServletRequest request) {
         return messageSource.getMessage(key, null, localeResolver.resolveLocale(request));
     }

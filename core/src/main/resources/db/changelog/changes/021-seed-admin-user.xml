@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-5.0.xsd">
+
+    <changeSet id="021-seed-admin-user" author="johncgo">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">
+                SELECT COUNT(*) FROM users WHERE _role = 'ADMIN'
+            </sqlCheck>
+        </preConditions>
+
+        <insert tableName="users">
+            <column name="_first_name"             value="Admin"/>
+            <column name="_last_name"              value="System"/>
+            <column name="_email"                  value="admin@techchallenge.local"/>
+            <column name="_birthday"               valueDate="2000-01-01"/>
+            <column name="_login"                  value="admin"/>
+            <column name="_password"               value="$2b$10$sK4ILTE2B0cH.HU1.d0PueOomUWf7Zls25jDlPe5x8ykU2qtIqPsa"/>
+            <column name="_phone"                  value="0000000000"/>
+            <column name="_created_at"             valueComputed="NOW()"/>
+            <column name="_hash"                   valueComputed="gen_random_uuid()::text"/>
+            <column name="_uuid"                   valueComputed="gen_random_uuid()"/>
+            <column name="_role"                   value="ADMIN"/>
+            <column name="_active"                 valueBoolean="true"/>
+            <column name="_tentativas_login_falha" valueNumeric="0"/>
+            <column name="_force_change_password"   valueBoolean="true"/>
+        </insert>
+
+        <rollback>
+            <delete tableName="users">
+                <where>_login = 'admin' AND _role = 'ADMIN'</where>
+            </delete>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

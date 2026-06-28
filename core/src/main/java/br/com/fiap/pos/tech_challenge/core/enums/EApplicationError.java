@@ -42,7 +42,12 @@ public enum EApplicationError {
     RESOURCE_IN_USE("error.resource_in_use", 28, HttpStatus.CONFLICT),
     OPTIMISTIC_LOCK_CONFLICT("error.optimistic_lock_conflict", 29, HttpStatus.CONFLICT),
     NOTIFICATION_NOT_FOUND("error.notification_not_found", 30, HttpStatus.NOT_FOUND),
-    VEHICLE_NOT_OWNED_BY_CUSTOMER("error.vehicle_not_owned_by_customer", 31, HttpStatus.UNPROCESSABLE_CONTENT);
+    VEHICLE_NOT_OWNED_BY_CUSTOMER("error.vehicle_not_owned_by_customer", 31, HttpStatus.UNPROCESSABLE_CONTENT),
+    LAST_ADMIN_DELETION_NOT_ALLOWED("error.last_admin_deletion_not_allowed", 32, HttpStatus.CONFLICT),
+    ADMIN_SELF_ROLE_CHANGE_NOT_ALLOWED("error.admin_self_role_change_not_allowed", 33, HttpStatus.UNPROCESSABLE_CONTENT),
+    PASSWORD_CHANGE_REQUIRED("error.password_change_required", 34, HttpStatus.FORBIDDEN),
+    WRONG_CURRENT_PASSWORD("error.wrong_current_password", 35, HttpStatus.BAD_REQUEST),
+    SAME_PASSWORD("error.same_password", 36, HttpStatus.UNPROCESSABLE_CONTENT);
 
     private static final Map<Integer, EApplicationError> BY_ERROR_CODE = new HashMap<>();
 

@@ -14,6 +14,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -31,6 +32,7 @@ public class UserController {
             summary = "API to find all users registered.",
             operationId = "find-all"
     )
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<UserDTO>> findAll() {
         return ResponseEntity.ok(service.findAll());
     }
@@ -46,6 +48,7 @@ public class UserController {
             required = true,
             content = @Content(schema = @Schema(implementation = Long.class))
     )
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<UserDTO> findById(@PathVariable final Long id) {
         return ResponseEntity.ok(service.findById(id));
     }
@@ -56,6 +59,7 @@ public class UserController {
             description = "Login and e-mail must be unique.",
             operationId = "create-user"
     )
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<UserDTO> create(@RequestBody @Valid final CreateUserDTO dto) {
         final var created = service.create(dto);
         return ResponseEntity.created(WebUtility.getLocation(created.id())).body(created);
@@ -72,6 +76,7 @@ public class UserController {
             required = true,
             content = @Content(schema = @Schema(implementation = Long.class))
     )
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable final Long id) {
         service.deleteById(id);
         return ResponseEntity.noContent().build();
@@ -93,6 +98,7 @@ public class UserController {
             required = true,
             content = @Content(schema = @Schema(implementation = Long.class))
     )
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<UserDTO> update(@PathVariable final Long id,
                                           @RequestBody @Valid final UpdateUserDTO dto) {
         return ResponseEntity.ok(service.update(id, dto));

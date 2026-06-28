@@ -7,9 +7,12 @@ import lombok.extern.log4j.Log4j2;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+
+import java.util.Objects;
 
 @ControllerAdvice
 @Log4j2
@@ -37,9 +40,17 @@ public class ExceptionHandling {
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    ResponseEntity<ErrorResponse> handleMethodArgumentNotValidException() {
-        final var error = EApplicationError.MISSING_FIELDS;
-        String message = translator.translate(error.getMessageKey());
+    ResponseEntity<ErrorResponse> handleMethodArgumentNotValidException(MethodArgumentNotValidException ex) {
+        String fallback = translator.translate(EApplicationError.MISSING_FIELDS.getMessageKey());
+
+        String message = ex.getBindingResult().getFieldErrors().stream()
+                .map(FieldError::getDefaultMessage)
+                .filter(Objects::nonNull)
+                .map(msg -> translator.translateOrDefault(msg, fallback))
+                .findFirst()
+                .orElse(fallback);
+
+        final var error = EApplicationError.INVALID_FIELDS;
         return ResponseEntity.status(error.getStatus()).body(new ErrorResponse(message, error.getErrorCode()));
     }
 

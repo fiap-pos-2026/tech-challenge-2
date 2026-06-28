@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springdoc.core.annotations.ParameterObject;
 import java.time.LocalDateTime;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -45,7 +46,7 @@ public class ServiceOrderController {
             @ApiResponse(responseCode = "201", description = "Service order created"),
             @ApiResponse(responseCode = "404", description = "Customer or vehicle not found")
     })
-    @PreAuthorize("hasRole('ATTENDANT')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT')")
     public ResponseEntity<ServiceOrderResponse> open(@RequestBody @Valid OpenServiceOrderRequest request) {
         ServiceOrderResponse created = service.openServiceOrder(
                 request.customerUuid(), request.vehicleUuid(), request.customerComplaint());
@@ -55,13 +56,13 @@ public class ServiceOrderController {
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "List service orders (paginated, filterable by status, customer and date)",
             operationId = "list-service-orders")
-    @PreAuthorize("hasAnyRole('ATTENDANT', 'MECHANIC')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT', 'MECHANIC')")
     public ResponseEntity<Page<ServiceOrderResponse>> list(
             @RequestParam(required = false) ServiceOrderStatus status,
             @RequestParam(required = false) java.util.UUID customerUuid,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
-            @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
+            @ParameterObject @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
         return ResponseEntity.ok(service.listServiceOrders(status, customerUuid, from, to, pageable));
     }
 
@@ -69,7 +70,7 @@ public class ServiceOrderController {
     @Operation(summary = "Get a service order by UUID", operationId = "get-service-order")
     @Parameter(name = "uuid", description = "Service order UUID", required = true,
             content = @Content(schema = @Schema(implementation = UUID.class)))
-    @PreAuthorize("hasAnyRole('ATTENDANT', 'MECHANIC')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT', 'MECHANIC')")
     public ResponseEntity<ServiceOrderResponse> get(@PathVariable UUID uuid) {
         return ResponseEntity.ok(service.getServiceOrder(uuid));
     }
@@ -91,7 +92,7 @@ public class ServiceOrderController {
             @ApiResponse(responseCode = "200", description = "Diagnosis started"),
             @ApiResponse(responseCode = "409", description = "Service order is not in RECEIVED status")
     })
-    @PreAuthorize("hasRole('MECHANIC')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MECHANIC')")
     public ResponseEntity<ServiceOrderResponse> startDiagnosis(@PathVariable UUID uuid) {
         return ResponseEntity.ok(service.startDiagnosis(uuid));
     }
@@ -99,7 +100,7 @@ public class ServiceOrderController {
     @PostMapping(path = "/{uuid}/diagnosis/services",
             consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Add a mechanical service to the diagnosis", operationId = "add-service-to-diagnosis")
-    @PreAuthorize("hasRole('MECHANIC')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MECHANIC')")
     public ResponseEntity<ServiceOrderResponse> addService(@PathVariable UUID uuid,
                                                             @RequestBody @Valid AddServiceRequest request) {
         return ResponseEntity.ok(service.addServiceToDiagnosis(uuid, request.mechanicalServiceUuid()));
@@ -113,7 +114,7 @@ public class ServiceOrderController {
             @ApiResponse(responseCode = "404", description = "Service not found in diagnosis"),
             @ApiResponse(responseCode = "409", description = "Service order is not in IN_DIAGNOSIS status")
     })
-    @PreAuthorize("hasRole('MECHANIC')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MECHANIC')")
     public ResponseEntity<ServiceOrderResponse> removeService(@PathVariable UUID uuid,
                                                                @PathVariable UUID mechanicalServiceUuid) {
         return ResponseEntity.ok(service.removeServiceFromDiagnosis(uuid, mechanicalServiceUuid));
@@ -122,7 +123,7 @@ public class ServiceOrderController {
     @PostMapping(path = "/{uuid}/diagnosis/products",
             consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Add a product to the diagnosis", operationId = "add-product-to-diagnosis")
-    @PreAuthorize("hasRole('MECHANIC')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MECHANIC')")
     public ResponseEntity<ServiceOrderResponse> addProduct(@PathVariable UUID uuid,
                                                             @RequestBody @Valid AddProductRequest request) {
         return ResponseEntity.ok(service.addProductToDiagnosis(uuid, request.productUuid(), request.quantity()));
@@ -134,7 +135,7 @@ public class ServiceOrderController {
             @ApiResponse(responseCode = "200", description = "Diagnosis completed, OTP sent to customer"),
             @ApiResponse(responseCode = "409", description = "Service order is not in IN_DIAGNOSIS status")
     })
-    @PreAuthorize("hasRole('MECHANIC')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MECHANIC')")
     public ResponseEntity<ServiceOrderResponse> completeDiagnosis(@PathVariable UUID uuid) {
         return ResponseEntity.ok(service.completeDiagnosis(uuid));
     }
@@ -165,7 +166,7 @@ public class ServiceOrderController {
             @ApiResponse(responseCode = "200", description = "OTP resent"),
             @ApiResponse(responseCode = "409", description = "Service order is not in AWAITING_APPROVAL")
     })
-    @PreAuthorize("hasRole('ATTENDANT')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT')")
     public ResponseEntity<Void> resendOtp(@PathVariable UUID uuid) {
         service.resendOTP(uuid);
         return ResponseEntity.ok().build();
@@ -179,7 +180,7 @@ public class ServiceOrderController {
             @ApiResponse(responseCode = "422", description = "Insufficient stock"),
             @ApiResponse(responseCode = "409", description = "Service order is not in IN_PROGRESS or AWAITING_APPROVAL")
     })
-    @PreAuthorize("hasRole('MECHANIC')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MECHANIC')")
     public ResponseEntity<ServiceOrderResponse> requestProduct(@PathVariable UUID uuid,
                                                                 @RequestBody @Valid RequestProductRequest request,
                                                                 @AuthenticationPrincipal UserDetailsImpl principal) {
@@ -196,7 +197,7 @@ public class ServiceOrderController {
             @ApiResponse(responseCode = "422", description = "Product is not returnable"),
             @ApiResponse(responseCode = "409", description = "Service order is not in IN_PROGRESS")
     })
-    @PreAuthorize("hasRole('ATTENDANT')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT')")
     public ResponseEntity<ServiceOrderResponse> returnProduct(@PathVariable UUID uuid,
                                                                @PathVariable UUID productUuid,
                                                                @RequestBody @Valid ReturnProductRequest request,
@@ -210,7 +211,7 @@ public class ServiceOrderController {
             @ApiResponse(responseCode = "200", description = "Execution completed"),
             @ApiResponse(responseCode = "409", description = "Service order is not in IN_PROGRESS")
     })
-    @PreAuthorize("hasRole('MECHANIC')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MECHANIC')")
     public ResponseEntity<ServiceOrderResponse> completeExecution(@PathVariable UUID uuid) {
         return ResponseEntity.ok(service.completeExecution(uuid));
     }
@@ -255,7 +256,7 @@ public class ServiceOrderController {
             @ApiResponse(responseCode = "200", description = "Service order closed as DISPUTED"),
             @ApiResponse(responseCode = "409", description = "Service order is in a terminal state")
     })
-    @PreAuthorize("hasRole('ATTENDANT')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT')")
     public ResponseEntity<ServiceOrderResponse> closeDispute(@PathVariable UUID uuid,
                                                               @RequestBody(required = false) CloseDisputeRequest request,
                                                               @AuthenticationPrincipal UserDetailsImpl principal) {

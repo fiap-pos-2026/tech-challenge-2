@@ -5,6 +5,7 @@ package br.com.fiap.pos.tech_challenge.core.enums;
  * @since 2026-06-24
  */
 public enum UserRole {
+    ADMIN,
     ATTENDANT,
     MECHANIC
 }

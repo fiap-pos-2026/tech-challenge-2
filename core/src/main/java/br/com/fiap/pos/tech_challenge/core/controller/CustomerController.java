@@ -33,7 +33,7 @@ public class CustomerController {
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Register a new customer", operationId = "register-customer")
-    @PreAuthorize("hasRole('ATTENDANT')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT')")
     public ResponseEntity<CustomerResponse> register(@RequestBody @Valid CreateCustomerRequest request) {
         final var created = service.register(request);
         return ResponseEntity.created(WebUtility.getLocation(created.uuid())).body(created);
@@ -41,7 +41,7 @@ public class CustomerController {
 
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Find a customer by document (CPF/CNPJ)", operationId = "find-customer-by-document")
-    @PreAuthorize("hasRole('ATTENDANT')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT')")
     public ResponseEntity<CustomerResponse> findByDocument(@RequestParam String document) {
         return ResponseEntity.ok(service.findByDocument(document));
     }
@@ -54,7 +54,7 @@ public class CustomerController {
             required = true,
             content = @Content(schema = @Schema(implementation = UUID.class))
     )
-    @PreAuthorize("hasRole('ATTENDANT')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT')")
     public ResponseEntity<CustomerResponse> findByUuid(@PathVariable UUID uuid) {
         return ResponseEntity.ok(service.findByUuid(uuid));
     }
@@ -63,7 +63,7 @@ public class CustomerController {
     @Operation(summary = "Update a customer", operationId = "update-customer")
     @Parameter(name = "uuid", description = "The customer UUID.", required = true,
             content = @Content(schema = @Schema(implementation = UUID.class)))
-    @PreAuthorize("hasRole('ATTENDANT')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT')")
     public ResponseEntity<CustomerResponse> update(@PathVariable UUID uuid,
                                                    @RequestBody @Valid UpdateCustomerRequest request) {
         return ResponseEntity.ok(service.update(uuid, request));
@@ -74,7 +74,7 @@ public class CustomerController {
             description = "Fails with 409 if the customer has active service orders.")
     @Parameter(name = "uuid", description = "The customer UUID.", required = true,
             content = @Content(schema = @Schema(implementation = UUID.class)))
-    @PreAuthorize("hasRole('ATTENDANT')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT')")
     public ResponseEntity<Void> delete(@PathVariable UUID uuid) {
         service.delete(uuid);
         return ResponseEntity.noContent().build();
@@ -88,7 +88,7 @@ public class CustomerController {
             required = true,
             content = @Content(schema = @Schema(implementation = UUID.class))
     )
-    @PreAuthorize("hasRole('ATTENDANT')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT')")
     public ResponseEntity<String> findFullDocument(@PathVariable UUID uuid) {
         return ResponseEntity.ok(service.findFullDocument(uuid));
     }

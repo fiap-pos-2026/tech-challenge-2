@@ -1,0 +1,2079 @@
+{
+  "info": {
+    "name": "Tech Challenge",
+    "description": "Collection organizada por domínio de negócio e fluxos de uso para a API Tech Challenge — sistema de atendimento e execução de serviços em oficina mecânica.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080/core"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "adminToken",
+      "value": ""
+    },
+    {
+      "key": "accessTokenMechanic",
+      "value": ""
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "mechanicUserId",
+      "value": ""
+    },
+    {
+      "key": "customerUuid",
+      "value": ""
+    },
+    {
+      "key": "vehicleUuid",
+      "value": ""
+    },
+    {
+      "key": "serviceOrderUuid",
+      "value": ""
+    },
+    {
+      "key": "mechanicalServiceUuid",
+      "value": ""
+    },
+    {
+      "key": "productUuid",
+      "value": ""
+    },
+    {
+      "key": "notificationUuid",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Setup",
+      "description": "Execute esta pasta em ordem para popular todas as variáveis usadas no restante da collection. Cada requisição salva automaticamente o ID retornado.",
+      "item": [
+        {
+          "name": "1. Login as Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"login\": \"admin\",\n  \"password\": \"admin\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/signin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "signin"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set(\"accessToken\", body.tokenValue);",
+                  "  pm.collectionVariables.set(\"adminToken\", body.tokenValue);",
+                  "  console.log(\"Admin token saved\");",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Change Admin Password",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"senhaAtual\": \"admin\",\n  \"novaSenha\": \"Admin@2025\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/profile/password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "profile",
+                "password"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Admin password changed\", () => {",
+                  "  pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Create Attendant User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Carlos\",\n  \"lastName\": \"Atendente\",\n  \"email\": \"carlos.atendente@garage.com\",\n  \"birthday\": \"1990-05-15\",\n  \"login\": \"carlos.atendente\",\n  \"password\": \"Senha@123\",\n  \"phone\": \"11999990001\",\n  \"role\": \"ATTENDANT\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set('userId', body.id);",
+                  "  console.log('Attendant userId:', body.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. Login as Attendant",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"login\": \"carlos.atendente\",\n  \"password\": \"Senha@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/signin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "signin"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set('accessToken', body.tokenValue);",
+                  "  console.log('Attendant token saved');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5. Create Mechanic User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Rafael\",\n  \"lastName\": \"Mecânico\",\n  \"email\": \"rafael.mecanico@garage.com\",\n  \"birthday\": \"1988-09-20\",\n  \"login\": \"rafael.mecanico\",\n  \"password\": \"Senha@456\",\n  \"phone\": \"11999990002\",\n  \"role\": \"MECHANIC\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set('mechanicUserId', body.id);",
+                  "  console.log('Mechanic userId:', body.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6. Login as Mechanic",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"login\": \"rafael.mecanico\",\n  \"password\": \"Senha@456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/signin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "signin"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set('accessTokenMechanic', body.tokenValue);",
+                  "  console.log('Mechanic token saved');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "7. Create Mechanical Service",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Troca de Óleo\",\n  \"description\": \"Troca de óleo e filtro de óleo\",\n  \"basePrice\": 120.00,\n  \"estimatedDurationMinutes\": 60\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/catalog/services",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "catalog",
+                "services"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set('mechanicalServiceUuid', body.uuid);",
+                  "  console.log('mechanicalServiceUuid:', body.uuid);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "8. Create Product",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Óleo Motor 5W30\",\n  \"description\": \"Óleo sintético para motor\",\n  \"type\": \"SUPPLY\",\n  \"measurementUnit\": \"LITER\",\n  \"unitPrice\": 45.00,\n  \"initialQuantity\": 50.0,\n  \"returnable\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/inventory/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "inventory",
+                "products"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set('productUuid', body.uuid);",
+                  "  console.log('productUuid:', body.uuid);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "9. Register Customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"CPF\",\n  \"document\": \"52998224725\",\n  \"name\": \"João Silva\",\n  \"email\": \"joao.silva@email.com\",\n  \"phone\": \"11988880001\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "customers"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set('customerUuid', body.uuid);",
+                  "  console.log('customerUuid:', body.uuid);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10. Register Vehicle",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"licensePlate\": \"ABC1D23\",\n  \"make\": \"Toyota\",\n  \"model\": \"Corolla\",\n  \"year\": 2022,\n  \"customerUuid\": \"{{customerUuid}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/vehicles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "vehicles"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set('vehicleUuid', body.uuid);",
+                  "  console.log('vehicleUuid:', body.uuid);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Authentication",
+      "description": "Autenticação de usuários internos (Atendentes e Mecânicos) via JWT RSA.",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"login\": \"carlos.atendente\",\n  \"password\": \"Senha@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/signin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "signin"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set(\"accessToken\", body.tokenValue);",
+                  "  pm.collectionVariables.set(\"adminToken\", body.tokenValue);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Profile",
+      "description": "Operações do perfil do usuário autenticado. Único grupo acessível quando forceChangePassword = true.",
+      "item": [
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"senhaAtual\": \"admin\",\n  \"novaSenha\": \"Admin@2025\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/profile/password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "profile",
+                "password"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Internal Users",
+      "description": "Gestão de usuários internos do sistema (Atendentes e Mecânicos). Requer JWT autenticado.",
+      "item": [
+        {
+          "name": "List Users",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Find User by ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{userId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Costa\",\n  \"email\": \"ana.costa@garage.com\",\n  \"birthday\": \"1995-03-10\",\n  \"login\": \"ana.costa\",\n  \"password\": \"Senha@789\",\n  \"phone\": \"11999990003\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set('userId', body.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Costa Silva\",\n  \"email\": \"ana.costa@garage.com\",\n  \"birthday\": \"1995-03-10\",\n  \"login\": \"ana.costa\",\n  \"password\": \"NovaSenha@789\",\n  \"phone\": \"11999990099\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{userId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{userId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Customer Management",
+      "description": "Cadastro e consulta de clientes da oficina. CPF/CNPJ é sempre mascarado nas respostas de listagem. Requer role ATTENDANT.",
+      "item": [
+        {
+          "name": "Register Customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"CPF\",\n  \"document\": \"52998224725\",\n  \"name\": \"João Silva\",\n  \"email\": \"joao.silva@email.com\",\n  \"phone\": \"11988880001\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "customers"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set('customerUuid', body.uuid);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Find Customer by Document",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/customers?document=52998224725",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "customers"
+              ],
+              "query": [
+                {
+                  "key": "document",
+                  "value": "52998224725"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Find Customer by UUID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/customers/{{customerUuid}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "customers",
+                "{{customerUuid}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Full Document (Unmasked)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/customers/{{customerUuid}}/document",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "customers",
+                "{{customerUuid}}",
+                "document"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Customer",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"João Carlos Silva\",\n  \"email\": \"joao.novo@email.com\",\n  \"phone\": \"11988880099\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/customers/{{customerUuid}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "customers",
+                "{{customerUuid}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Customer",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/customers/{{customerUuid}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "customers",
+                "{{customerUuid}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Vehicle Management",
+      "description": "Cadastro e consulta de veículos dos clientes. Placa aceita formato antigo (ABC1234) e Mercosul (ABC1D23).",
+      "item": [
+        {
+          "name": "Register Vehicle",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"licensePlate\": \"ABC1D23\",\n  \"make\": \"Toyota\",\n  \"model\": \"Corolla\",\n  \"year\": 2022,\n  \"customerUuid\": \"{{customerUuid}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/vehicles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "vehicles"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set('vehicleUuid', body.uuid);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Find Vehicle by License Plate",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/vehicles?licensePlate=ABC1D23",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "vehicles"
+              ],
+              "query": [
+                {
+                  "key": "licensePlate",
+                  "value": "ABC1D23"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Find Vehicle by UUID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/vehicles/{{vehicleUuid}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "vehicles",
+                "{{vehicleUuid}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Vehicle",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"make\": \"Toyota\",\n  \"model\": \"Corolla XEI\",\n  \"year\": 2023\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/vehicles/{{vehicleUuid}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "vehicles",
+                "{{vehicleUuid}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Vehicle",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/vehicles/{{vehicleUuid}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "vehicles",
+                "{{vehicleUuid}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Service Orders",
+      "description": "Ciclo de vida completo das Ordens de Serviço: abertura → diagnóstico → orçamento (OTP) → execução → entrega.",
+      "item": [
+        {
+          "name": "Opening",
+          "description": "Abertura e consulta de Ordens de Serviço.",
+          "item": [
+            {
+              "name": "Open Service Order",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"customerUuid\": \"{{customerUuid}}\",\n  \"vehicleUuid\": \"{{vehicleUuid}}\",\n  \"customerComplaint\": \"Barulho estranho ao frear e vibração no volante acima de 80 km/h.\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/service-orders",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "service-orders"
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "  const body = pm.response.json();",
+                      "  pm.collectionVariables.set('serviceOrderUuid', body.uuid);",
+                      "  console.log('serviceOrderUuid:', body.uuid);",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "List Service Orders",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/api/service-orders?page=0&size=20",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "service-orders"
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "",
+                      "disabled": true,
+                      "description": "RECEIVED | IN_DIAGNOSIS | AWAITING_APPROVAL | IN_PROGRESS | COMPLETED | DELIVERED | CANCELLED | DISPUTED"
+                    },
+                    {
+                      "key": "customerUuid",
+                      "value": "",
+                      "disabled": true
+                    },
+                    {
+                      "key": "from",
+                      "value": "",
+                      "disabled": true,
+                      "description": "ISO 8601, ex: 2026-06-01T00:00:00"
+                    },
+                    {
+                      "key": "to",
+                      "value": "",
+                      "disabled": true,
+                      "description": "ISO 8601, ex: 2026-06-30T23:59:59"
+                    },
+                    {
+                      "key": "page",
+                      "value": "0"
+                    },
+                    {
+                      "key": "size",
+                      "value": "20"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Service Order",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/api/service-orders/{{serviceOrderUuid}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "service-orders",
+                    "{{serviceOrderUuid}}"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Service Order Status (Public)",
+              "request": {
+                "method": "GET",
+                "auth": {
+                  "type": "noauth"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/service-orders/{{serviceOrderUuid}}/status",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "service-orders",
+                    "{{serviceOrderUuid}}",
+                    "status"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Diagnosis",
+          "description": "Fluxo de diagnóstico executado pelo Mecânico. Requer role MECHANIC (usa {{accessTokenMechanic}}).",
+          "item": [
+            {
+              "name": "Start Diagnosis",
+              "request": {
+                "method": "POST",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessTokenMechanic}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/service-orders/{{serviceOrderUuid}}/diagnosis/start",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "service-orders",
+                    "{{serviceOrderUuid}}",
+                    "diagnosis",
+                    "start"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Add Mechanical Service",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessTokenMechanic}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"mechanicalServiceUuid\": \"{{mechanicalServiceUuid}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/service-orders/{{serviceOrderUuid}}/diagnosis/services",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "service-orders",
+                    "{{serviceOrderUuid}}",
+                    "diagnosis",
+                    "services"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Remove Mechanical Service from Diagnosis",
+              "request": {
+                "method": "DELETE",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessTokenMechanic}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/service-orders/{{serviceOrderUuid}}/diagnosis/services/{{mechanicalServiceUuid}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "service-orders",
+                    "{{serviceOrderUuid}}",
+                    "diagnosis",
+                    "services",
+                    "{{mechanicalServiceUuid}}"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Add Product to Diagnosis",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessTokenMechanic}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"productUuid\": \"{{productUuid}}\",\n  \"quantity\": 2.0\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/service-orders/{{serviceOrderUuid}}/diagnosis/products",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "service-orders",
+                    "{{serviceOrderUuid}}",
+                    "diagnosis",
+                    "products"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Complete Diagnosis",
+              "request": {
+                "method": "POST",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessTokenMechanic}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/service-orders/{{serviceOrderUuid}}/diagnosis/complete",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "service-orders",
+                    "{{serviceOrderUuid}}",
+                    "diagnosis",
+                    "complete"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Quote Approval",
+          "description": "Aprovação ou rejeição do orçamento pelo Cliente via OTP enviado por e-mail. Endpoints públicos (sem JWT).",
+          "item": [
+            {
+              "name": "Approve Quote (Customer via OTP)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"token\": \"<OTP_RECEBIDO_POR_EMAIL>\",\n  \"customerDocument\": \"52998224725\",\n  \"decision\": \"APPROVE\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/service-orders/{{serviceOrderUuid}}/approval",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "service-orders",
+                    "{{serviceOrderUuid}}",
+                    "approval"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Reject Quote (Customer via OTP)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"token\": \"<OTP_RECEBIDO_POR_EMAIL>\",\n  \"customerDocument\": \"52998224725\",\n  \"decision\": \"REJECT\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/service-orders/{{serviceOrderUuid}}/approval",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "service-orders",
+                    "{{serviceOrderUuid}}",
+                    "approval"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Resend OTP",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{baseUrl}}/api/service-orders/{{serviceOrderUuid}}/otp/resend",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "service-orders",
+                    "{{serviceOrderUuid}}",
+                    "otp",
+                    "resend"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Execution",
+          "description": "Execução dos serviços com controle de estoque. Pedido de produto não-orçado dispara novo fluxo de aprovação (adendo).",
+          "item": [
+            {
+              "name": "Request Product (Debit Stock)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessTokenMechanic}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"productUuid\": \"{{productUuid}}\",\n  \"quantity\": 3.0\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/service-orders/{{serviceOrderUuid}}/execution/products",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "service-orders",
+                    "{{serviceOrderUuid}}",
+                    "execution",
+                    "products"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Return Product to Stock",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"password\": \"Senha@123\",\n  \"productLineUuid\": \"<uuid-da-linha-de-produto-no-orcamento>\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/service-orders/{{serviceOrderUuid}}/products/{{productUuid}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "service-orders",
+                    "{{serviceOrderUuid}}",
+                    "products",
+                    "{{productUuid}}"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Complete Execution",
+              "request": {
+                "method": "POST",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessTokenMechanic}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/service-orders/{{serviceOrderUuid}}/execution/complete",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "service-orders",
+                    "{{serviceOrderUuid}}",
+                    "execution",
+                    "complete"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delivery",
+          "description": "Entrega do veículo ao cliente. Pode ser aceita pelo Atendente (JWT) ou pelo Cliente (OTP). Rejeição dispara retrabalho.",
+          "item": [
+            {
+              "name": "Accept Delivery (Attendant via JWT)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/service-orders/{{serviceOrderUuid}}/delivery/accept",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "service-orders",
+                    "{{serviceOrderUuid}}",
+                    "delivery",
+                    "accept"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Accept Delivery (Customer via OTP)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"token\": \"<OTP_RECEBIDO_POR_EMAIL>\",\n  \"customerDocument\": \"52998224725\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/service-orders/{{serviceOrderUuid}}/delivery/accept",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "service-orders",
+                    "{{serviceOrderUuid}}",
+                    "delivery",
+                    "accept"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Reject Delivery (Customer via OTP)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "auth": {
+                  "type": "noauth"
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"token\": \"<OTP_RECEBIDO_POR_EMAIL>\",\n  \"customerDocument\": \"52998224725\",\n  \"reason\": \"O freio ainda está fazendo barulho e a vibração persiste acima de 80 km/h.\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/service-orders/{{serviceOrderUuid}}/delivery/reject",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "service-orders",
+                    "{{serviceOrderUuid}}",
+                    "delivery",
+                    "reject"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Close Dispute (Attendant)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"resolution\": \"Cliente não compareceu para nova tentativa de entrega após 3 contatos. OS encerrada como disputada.\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/service-orders/{{serviceOrderUuid}}/close-dispute",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "service-orders",
+                    "{{serviceOrderUuid}}",
+                    "close-dispute"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Catalog",
+      "description": "Catálogo de serviços mecânicos oferecidos pela oficina. Gestão exclusiva do Atendente; consulta liberada para Mecânico.",
+      "item": [
+        {
+          "name": "Create Mechanical Service",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Alinhamento e Balanceamento\",\n  \"description\": \"Alinhamento computadorizado e balanceamento das quatro rodas\",\n  \"basePrice\": 180.00,\n  \"estimatedDurationMinutes\": 90\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/catalog/services",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "catalog",
+                "services"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set('mechanicalServiceUuid', body.uuid);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Mechanical Services",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/catalog/services?page=0&size=20&sort=name",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "catalog",
+                "services"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                },
+                {
+                  "key": "sort",
+                  "value": "name"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Find Mechanical Service",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/catalog/services/{{mechanicalServiceUuid}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "catalog",
+                "services",
+                "{{mechanicalServiceUuid}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Mechanical Service",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Alinhamento e Balanceamento 4 Rodas\",\n  \"description\": \"Alinhamento computadorizado a laser e balanceamento das quatro rodas\",\n  \"basePrice\": 200.00,\n  \"estimatedDurationMinutes\": 90\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/catalog/services/{{mechanicalServiceUuid}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "catalog",
+                "services",
+                "{{mechanicalServiceUuid}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Average Duration by Service",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/catalog/services/avg-duration",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "catalog",
+                "services",
+                "avg-duration"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Mechanical Service",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/catalog/services/{{mechanicalServiceUuid}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "catalog",
+                "services",
+                "{{mechanicalServiceUuid}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Inventory",
+      "description": "Gestão de produtos e movimentações de estoque. Produtos de tipo SUPPLY ou PART; campo 'returnable' controla se pode ser devolvido ao estoque.",
+      "item": [
+        {
+          "name": "Products",
+          "description": "CRUD de produtos do inventário. Gestão exclusiva do Atendente; consulta liberada para Mecânico.",
+          "item": [
+            {
+              "name": "Create Product",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Pastilha de Freio Dianteira\",\n  \"description\": \"Pastilha de freio para eixo dianteiro\",\n  \"type\": \"PART\",\n  \"measurementUnit\": \"UNIT\",\n  \"unitPrice\": 89.90,\n  \"initialQuantity\": 20,\n  \"returnable\": false\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/inventory/products",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "inventory",
+                    "products"
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 201) {",
+                      "  const body = pm.response.json();",
+                      "  pm.collectionVariables.set('productUuid', body.uuid);",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "List Products",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/api/inventory/products?page=0&size=20&sort=name",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "inventory",
+                    "products"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "0"
+                    },
+                    {
+                      "key": "size",
+                      "value": "20"
+                    },
+                    {
+                      "key": "sort",
+                      "value": "name"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Find Product",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/api/inventory/products/{{productUuid}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "inventory",
+                    "products",
+                    "{{productUuid}}"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Update Product",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Pastilha de Freio Dianteira Premium\",\n  \"description\": \"Pastilha de freio premium para eixo dianteiro\",\n  \"type\": \"PART\",\n  \"measurementUnit\": \"UNIT\",\n  \"unitPrice\": 109.90,\n  \"initialQuantity\": 20,\n  \"returnable\": false\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/inventory/products/{{productUuid}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "inventory",
+                    "products",
+                    "{{productUuid}}"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Delete Product",
+              "request": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{baseUrl}}/api/inventory/products/{{productUuid}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "inventory",
+                    "products",
+                    "{{productUuid}}"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Stock",
+          "description": "Movimentações de estoque: reposição manual, ajuste de auditoria e histórico de movimentos.",
+          "item": [
+            {
+              "name": "Replenish Product Stock",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"quantity\": 10.0\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/inventory/products/{{productUuid}}/replenishment",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "inventory",
+                    "products",
+                    "{{productUuid}}",
+                    "replenishment"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Register Manual Adjustment",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"productUuid\": \"{{productUuid}}\",\n  \"quantity\": 1.0,\n  \"reason\": \"Ajuste de inventário físico — diferença apurada na contagem de 2026-06-27\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/inventory/manual-adjustment",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "inventory",
+                    "manual-adjustment"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "List Stock Movements",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/api/inventory/movements?page=0&size=20",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "inventory",
+                    "movements"
+                  ],
+                  "query": [
+                    {
+                      "key": "productId",
+                      "value": "",
+                      "disabled": true,
+                      "description": "Filtra por ID interno do produto (opcional)"
+                    },
+                    {
+                      "key": "page",
+                      "value": "0"
+                    },
+                    {
+                      "key": "size",
+                      "value": "20"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "description": "Notificações do sistema para Atendentes e Mecânicos. Criadas automaticamente por eventos como aprovação de OS, estoque insuficiente, retrabalho, etc.",
+      "item": [
+        {
+          "name": "List Notifications",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications?page=0&size=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  const items = body.content;",
+                  "  if (items && items.length > 0) {",
+                  "    pm.collectionVariables.set('notificationUuid', items[0].uuid);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mark Notification as Read",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications/{{notificationUuid}}/read",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                "{{notificationUuid}}",
+                "read"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

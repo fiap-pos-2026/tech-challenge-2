@@ -73,6 +73,9 @@ public class User implements Serializable {
     @Column(name = "_bloqueado_ate")
     private LocalDateTime lockedUntil;
 
+    @Column(name = "_force_change_password", nullable = false)
+    private boolean forceChangePassword = false;
+
     public User(User that) {
         this.id = that.id;
         this.firstName = that.firstName;
@@ -90,6 +93,7 @@ public class User implements Serializable {
         this.active = that.active;
         this.loginFailedAttempts = that.loginFailedAttempts;
         this.lockedUntil = that.lockedUntil;
+        this.forceChangePassword = that.forceChangePassword;
     }
 
     @Override

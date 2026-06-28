@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -50,7 +51,7 @@ public class InventoryController {
             required = true,
             content = @Content(schema = @Schema(implementation = UUID.class))
     )
-    @PreAuthorize("hasRole('ATTENDANT')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT')")
     public ResponseEntity<Void> replenish(@PathVariable UUID uuid,
                                           @RequestBody @Valid ReplenishmentRequest request,
                                           @AuthenticationPrincipal UserDetailsImpl principal) {
@@ -67,7 +68,7 @@ public class InventoryController {
             @ApiResponse(responseCode = "204", description = "Adjustment recorded"),
             @ApiResponse(responseCode = "404", description = "Product not found")
     })
-    @PreAuthorize("hasRole('ATTENDANT')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT')")
     public ResponseEntity<Void> registerManualAdjustment(
             @RequestBody @Valid ManualAdjustmentRequest request,
             @AuthenticationPrincipal UserDetailsImpl principal) {
@@ -78,10 +79,10 @@ public class InventoryController {
 
     @GetMapping(path = "/movements", produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "List all stock movements (paginated)", operationId = "list-stock-movements")
-    @PreAuthorize("hasRole('ATTENDANT')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT')")
     public ResponseEntity<Page<StockMovementResponse>> listMovements(
             @RequestParam(required = false) Long productId,
-            @PageableDefault(size = 20) Pageable pageable) {
+            @ParameterObject @PageableDefault(size = 20) Pageable pageable) {
         Page<StockMovement> page = productId != null
                 ? stockService.listMovementsByProduct(productId, pageable)
                 : stockService.listAllMovements(pageable);

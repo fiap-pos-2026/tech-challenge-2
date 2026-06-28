@@ -33,7 +33,7 @@ public class VehicleController {
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Register a new vehicle", operationId = "register-vehicle")
-    @PreAuthorize("hasRole('ATTENDANT')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT')")
     public ResponseEntity<VehicleResponse> register(@RequestBody @Valid CreateVehicleRequest request) {
         final var created = service.register(request);
         return ResponseEntity.created(WebUtility.getLocation(created.uuid())).body(created);
@@ -41,7 +41,7 @@ public class VehicleController {
 
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Find a vehicle by license plate", operationId = "find-vehicle-by-license-plate")
-    @PreAuthorize("hasAnyRole('ATTENDANT', 'MECHANIC')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT', 'MECHANIC')")
     public ResponseEntity<VehicleResponse> findByLicensePlate(@RequestParam String licensePlate) {
         return ResponseEntity.ok(service.findByLicensePlate(licensePlate));
     }
@@ -50,7 +50,7 @@ public class VehicleController {
     @Operation(summary = "Update a vehicle", operationId = "update-vehicle")
     @Parameter(name = "uuid", description = "The vehicle UUID.", required = true,
             content = @Content(schema = @Schema(implementation = UUID.class)))
-    @PreAuthorize("hasRole('ATTENDANT')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT')")
     public ResponseEntity<VehicleResponse> update(@PathVariable UUID uuid,
                                                    @RequestBody @Valid UpdateVehicleRequest request) {
         return ResponseEntity.ok(service.update(uuid, request));
@@ -61,7 +61,7 @@ public class VehicleController {
             description = "Fails with 409 if the vehicle has active service orders.")
     @Parameter(name = "uuid", description = "The vehicle UUID.", required = true,
             content = @Content(schema = @Schema(implementation = UUID.class)))
-    @PreAuthorize("hasRole('ATTENDANT')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT')")
     public ResponseEntity<Void> delete(@PathVariable UUID uuid) {
         service.delete(uuid);
         return ResponseEntity.noContent().build();
@@ -75,7 +75,7 @@ public class VehicleController {
             required = true,
             content = @Content(schema = @Schema(implementation = UUID.class))
     )
-    @PreAuthorize("hasRole('ATTENDANT') or hasRole('MECHANIC')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT', 'MECHANIC')")
     public ResponseEntity<VehicleResponse> findByUuid(@PathVariable UUID uuid) {
         return ResponseEntity.ok(service.findByUuid(uuid));
     }

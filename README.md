@@ -65,6 +65,36 @@ MAIL_SMTP_AUTH=true
 MAIL_SMTP_STARTTLS=true
 ```
 
+### 4. Senha inicial do administrador (OWASP A07)
+
+Na primeira inicialização, a aplicação detecta que o usuário `admin` ainda não trocou a senha e:
+
+1. Se `ADMIN_INITIAL_PASSWORD` estiver definida como variável de ambiente, usa esse valor.
+2. Caso contrário, **gera automaticamente uma senha aleatória de 16 caracteres** (maiúsculas, minúsculas, dígitos e símbolos).
+3. Em ambos os casos, **imprime a senha nos logs** com destaque:
+
+```
+=================================================================
+  CREDENCIAL INICIAL DO ADMINISTRADOR
+  Login : admin
+  Senha : xK3@mQ7!rBv2#Yz9
+  ALTERE ESTA SENHA IMEDIATAMENTE APÓS O PRIMEIRO LOGIN.
+  Defina ADMIN_INITIAL_PASSWORD para controlar a senha inicial.
+=================================================================
+```
+
+Para definir a senha inicial via variável de ambiente:
+
+```bash
+# Execução direta
+ADMIN_INITIAL_PASSWORD="MinhaSenh@Forte2026!" ./gradlew :core:bootRun
+
+# Docker Compose — descomente a linha no docker-compose.yml:
+# ADMIN_INITIAL_PASSWORD: "MinhaSenh@Forte2026!"
+```
+
+**Após o primeiro login**, o sistema bloqueia todas as operações e exige a troca da senha em `PUT /api/profile/password`. A senha nova deve ter no mínimo 8 caracteres com ao menos uma letra maiúscula, um número e um caractere especial.
+
 ---
 
 ## Executando a aplicação
@@ -124,6 +154,41 @@ Os testes de integração sobem um PostgreSQL via Testcontainers — certifique-
 ```
 RECEIVED → IN_DIAGNOSIS → AWAITING_APPROVAL → IN_PROGRESS → COMPLETED → DELIVERED
 ```
+
+---
+
+## Segurança (OWASP)
+
+### OWASP A07:2021 — Identification and Authentication Failures
+
+| Controle | Implementação |
+|---|---|
+| Sem credenciais padrão | `AdminCredentialInitializer` gera senha aleatória na primeira boot; `ADMIN_INITIAL_PASSWORD` permite controle via env var |
+| Troca de senha obrigatória | Flag `force_change_password` no banco; `PasswordChangeRequiredFilter` bloqueia 100% das rotas até a troca, exceto `GET /api/profile` e `PUT /api/profile/password` |
+| Bloqueio por força bruta (login) | 5 tentativas → bloqueio de 15 min (`AuthenticationService`) |
+| Bloqueio por força bruta (troca de senha) | 5 tentativas de `senhaAtual` errada → bloqueio de 15 min (`UserService.changePassword`) |
+| Reutilização de senha proibida | `changePassword` rejeita `novaSenha == senhaAtual` (código 36 — `SAME_PASSWORD`) |
+| Complexidade de senha | Regex `^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$` no DTO de troca |
+| JWT com expiração | RSA RS256 com `jwt.expiry.duration` configurável |
+| Invalidação de token por hash | `TokenUtility.validate()` cruza claim `hash` com o banco — tokens de usuários deletados/recriados são rejeitados |
+| Conta inativa bloqueada | `JWTAuthorizationFilter` verifica `active` no banco a cada request |
+| Reautenticação para operações críticas | Devolução de produto exige `validatePassword()` |
+
+### OWASP A09:2021 — Security Logging and Monitoring Failures
+
+Todos os eventos críticos são registrados em `security_audit_log`:
+
+| Evento | `AuditEventType` |
+|---|---|
+| Login bem-sucedido | `LOGIN_SUCCESS` |
+| Login com credenciais inválidas | `LOGIN_FAILED` |
+| Conta bloqueada | `OTP_INVALID_LIMIT` |
+| Troca de senha bem-sucedida | `PASSWORD_CHANGED` |
+| Senha atual errada em troca | `PASSWORD_CHANGE_FAILED` |
+| Reautenticação bem-sucedida | `REAUTHENTICATION_SUCCESS` |
+| Reautenticação falha | `REAUTHENTICATION_FAILED` |
+| Mudança de perfil | `USER_ROLE_CHANGED` |
+| Encerramento de disputa | `DISPUTED_CLOSURE` |
 
 ---
 

@@ -31,22 +31,27 @@ public class TokenUtility {
     public TokenDTO generate(final UserDetailsImpl impl) {
         var currentInstant = Instant.now();
 
-        JwtClaimsSet claims = JwtClaimsSet.builder()
+        var builder = JwtClaimsSet.builder()
                 .issuer("tech-challenge-app")
                 .issuedAt(currentInstant)
                 .expiresAt(currentInstant.plus(expiryTime))
                 .subject(impl.getLogin())
                 .claim("id", impl.getId())
-                .claim("uuid", impl.getUuid() != null ? impl.getUuid().toString() : null)
-                .claim("role", impl.getRole() != null ? impl.getRole().name() : null)
                 .claim("first_name", impl.getFirstName())
                 .claim("last_name", impl.getLastName())
                 .claim("e-mail", impl.getEmail())
                 .claim("phone", impl.getPhone())
                 .claim("hash", impl.getHash())
-                .build();
+                .claim("force_change_password", impl.isForceChangePassword());
 
-        return mapper.toDTO(encoder.encode(JwtEncoderParameters.from(claims)));
+        if (impl.getUuid() != null) {
+            builder.claim("uuid", impl.getUuid().toString());
+        }
+        if (impl.getRole() != null) {
+            builder.claim("role", impl.getRole().name());
+        }
+
+        return mapper.toDTO(encoder.encode(JwtEncoderParameters.from(builder.build())));
     }
 
     public Jwt decode(final String token) {

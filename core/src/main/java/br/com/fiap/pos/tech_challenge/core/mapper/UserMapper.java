@@ -28,6 +28,7 @@ public interface UserMapper {
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "password", qualifiedByName = "passwordEncoder")
+    @Mapping(target = "role", conditionExpression = "java(dto.role() != null)")
     User fullUpdate(UpdateUserDTO dto, @MappingTarget User entity);
 
     @Named("passwordEncoder")

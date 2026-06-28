@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -35,7 +36,7 @@ public class ProductController {
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Create a new product", operationId = "create-product")
-    @PreAuthorize("hasRole('ATTENDANT')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT')")
     public ResponseEntity<ProductResponse> create(@RequestBody @Valid CreateProductRequest request) {
         final var created = service.create(request);
         return ResponseEntity.created(WebUtility.getLocation(created.uuid())).body(created);
@@ -43,9 +44,9 @@ public class ProductController {
 
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "List all products (paginated)", operationId = "list-products")
-    @PreAuthorize("hasAnyRole('ATTENDANT', 'MECHANIC')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT', 'MECHANIC')")
     public ResponseEntity<Page<ProductResponse>> findAll(
-            @PageableDefault(size = 20, sort = "name") Pageable pageable) {
+            @ParameterObject @PageableDefault(size = 20, sort = "name") Pageable pageable) {
         return ResponseEntity.ok(service.findAll(pageable));
     }
 
@@ -57,7 +58,7 @@ public class ProductController {
             required = true,
             content = @Content(schema = @Schema(implementation = UUID.class))
     )
-    @PreAuthorize("hasAnyRole('ATTENDANT', 'MECHANIC')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT', 'MECHANIC')")
     public ResponseEntity<ProductResponse> findByUuid(@PathVariable UUID uuid) {
         return ResponseEntity.ok(service.findByUuid(uuid));
     }
@@ -70,7 +71,7 @@ public class ProductController {
             required = true,
             content = @Content(schema = @Schema(implementation = UUID.class))
     )
-    @PreAuthorize("hasRole('ATTENDANT')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT')")
     public ResponseEntity<ProductResponse> update(@PathVariable UUID uuid,
                                                   @RequestBody @Valid CreateProductRequest request) {
         return ResponseEntity.ok(service.update(uuid, request));
@@ -85,7 +86,7 @@ public class ProductController {
             required = true,
             content = @Content(schema = @Schema(implementation = UUID.class))
     )
-    @PreAuthorize("hasRole('ATTENDANT')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT')")
     public ResponseEntity<Void> delete(@PathVariable UUID uuid) {
         service.delete(uuid);
         return ResponseEntity.noContent().build();

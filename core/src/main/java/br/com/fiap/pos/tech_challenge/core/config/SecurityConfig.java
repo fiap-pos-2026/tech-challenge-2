@@ -3,6 +3,7 @@ package br.com.fiap.pos.tech_challenge.core.config;
 import br.com.fiap.pos.tech_challenge.core.security.AppAuthEntryPoint;
 import br.com.fiap.pos.tech_challenge.core.security.AuditLogFilter;
 import br.com.fiap.pos.tech_challenge.core.security.JWTAuthorizationFilter;
+import br.com.fiap.pos.tech_challenge.core.security.PasswordChangeRequiredFilter;
 import br.com.fiap.pos.tech_challenge.core.util.Translator;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
@@ -19,14 +20,13 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
@@ -51,6 +51,8 @@ public class SecurityConfig {
     private final AppAuthEntryPoint appAuthEntryPoint;
 
     private final AuditLogFilter auditLogFilter;
+
+    private final PasswordChangeRequiredFilter passwordChangeRequiredFilter;
 
     private final Translator translator;
 
@@ -83,16 +85,12 @@ public class SecurityConfig {
                 .formLogin(AbstractHttpConfigurer::disable)
                 .addFilter(authorizationFilter())
                 .addFilterAfter(auditLogFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(passwordChangeRequiredFilter, BasicAuthenticationFilter.class)
                 .exceptionHandling(Customizer.withDefaults())
                 .oauth2ResourceServer(it -> it
                         .jwt(jwt -> jwt.decoder(jwtDecoder()))
                         .authenticationEntryPoint(appAuthEntryPoint))
                 .build();
-    }
-
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
     }
 
     @Bean

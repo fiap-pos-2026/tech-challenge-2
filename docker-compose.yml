@@ -41,6 +41,7 @@ services:
       JWT_PRIVATE_KEY: file:/run/certs/dev-private.pem
       MAIL_HOST: mailpit
       MAIL_PORT: 1025
+      # ADMIN_INITIAL_PASSWORD: "SenhaForte@2026!"   # opcional — gerada aleatoriamente se omitida
     volumes:
       - ./core/src/main/resources/certs:/run/certs:ro
     healthcheck:

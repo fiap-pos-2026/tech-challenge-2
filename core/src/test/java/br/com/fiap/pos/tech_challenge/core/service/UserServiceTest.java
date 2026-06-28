@@ -4,15 +4,22 @@ import br.com.fiap.pos.tech_challenge.core.controller.dto.CreateUserDTO;
 import br.com.fiap.pos.tech_challenge.core.controller.dto.UpdateUserDTO;
 import br.com.fiap.pos.tech_challenge.core.controller.dto.UserDTO;
 import br.com.fiap.pos.tech_challenge.core.domain.User;
+import br.com.fiap.pos.tech_challenge.core.enums.UserRole;
 import br.com.fiap.pos.tech_challenge.core.exception.CoreException;
 import br.com.fiap.pos.tech_challenge.core.mapper.UserMapper;
 import br.com.fiap.pos.tech_challenge.core.repository.UserRepository;
+import br.com.fiap.pos.tech_challenge.core.security.UserDetailsImpl;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -32,8 +39,25 @@ class UserServiceTest {
 
     @Mock UserRepository repository;
     @Mock UserMapper mapper;
+    @Mock br.com.fiap.pos.tech_challenge.core.service.AuditLogService auditLogService;
+    @Mock PasswordEncoder passwordEncoder;
 
     @InjectMocks UserService sut;
+
+    @BeforeEach
+    void setUpSecurityContext() {
+        User u = user("admin");
+        u.setId(999L);
+        u.setRole(UserRole.ADMIN);
+        UserDetailsImpl principal = new UserDetailsImpl(u);
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities()));
+    }
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
 
     // ---- loadUserByUsername ----
 
@@ -126,7 +150,8 @@ class UserServiceTest {
 
     @Test
     void deleteById_removesWhenExists() {
-        when(repository.existsById(1L)).thenReturn(true);
+        User target = user("atendente");
+        when(repository.findById(1L)).thenReturn(Optional.of(target));
 
         sut.deleteById(1L);
 
@@ -135,7 +160,7 @@ class UserServiceTest {
 
     @Test
     void deleteById_throwsWhenNotFound() {
-        when(repository.existsById(99L)).thenReturn(false);
+        when(repository.findById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> sut.deleteById(99L))
                 .isInstanceOf(CoreException.class);
@@ -188,6 +213,55 @@ class UserServiceTest {
                 .isInstanceOf(CoreException.class);
     }
 
+    // ---- changePassword ----
+
+    @Test
+    void changePassword_succeedsAndClearsLockout() {
+        User u = user("joao");
+        u.setId(1L);
+        u.setLoginFailedAttempts(2);
+        when(repository.findById(1L)).thenReturn(Optional.of(u));
+        when(passwordEncoder.matches("senhaAtual", "hash")).thenReturn(true);
+        when(passwordEncoder.matches("novaSenha@1", "hash")).thenReturn(false);
+        when(passwordEncoder.encode("novaSenha@1")).thenReturn("newHash");
+
+        sut.changePassword(1L, new br.com.fiap.pos.tech_challenge.core.controller.dto.ChangePasswordDTO("senhaAtual", "novaSenha@1"));
+
+        assertThat(u.getLoginFailedAttempts()).isZero();
+        assertThat(u.getLockedUntil()).isNull();
+        assertThat(u.isForceChangePassword()).isFalse();
+        verify(repository).save(u);
+        verify(auditLogService).register(any(), any(), any(), eq("SUCCESS"), any());
+    }
+
+    @Test
+    void changePassword_throwsWhenCurrentPasswordWrongAndIncrementsAttempts() {
+        User u = user("joao");
+        u.setId(1L);
+        when(repository.findById(1L)).thenReturn(Optional.of(u));
+        when(passwordEncoder.matches("errada", "hash")).thenReturn(false);
+
+        assertThatThrownBy(() ->
+                sut.changePassword(1L, new br.com.fiap.pos.tech_challenge.core.controller.dto.ChangePasswordDTO("errada", "NovaSenha@1")))
+                .isInstanceOf(CoreException.class);
+
+        assertThat(u.getLoginFailedAttempts()).isEqualTo(1);
+        verify(auditLogService).register(any(), any(), any(), eq("401"), any());
+    }
+
+    @Test
+    void changePassword_throwsWhenNewPasswordSameAsCurrent() {
+        User u = user("joao");
+        u.setId(1L);
+        when(repository.findById(1L)).thenReturn(Optional.of(u));
+        // both calls use same args → single stub covers current-matches + new-same-as-current check
+        when(passwordEncoder.matches("senhaAtual", "hash")).thenReturn(true);
+
+        assertThatThrownBy(() ->
+                sut.changePassword(1L, new br.com.fiap.pos.tech_challenge.core.controller.dto.ChangePasswordDTO("senhaAtual", "senhaAtual")))
+                .isInstanceOf(CoreException.class);
+    }
+
     // ---- findByLogin ----
 
     @Test
@@ -234,10 +308,10 @@ class UserServiceTest {
     }
 
     private CreateUserDTO createDto(String login, String email) {
-        return new CreateUserDTO("João", "Silva", email, LocalDate.of(1990, 1, 1), login, "senha123", "11999999999");
+        return new CreateUserDTO("João", "Silva", email, LocalDate.of(1990, 1, 1), login, "senha123", "11999999999", null);
     }
 
     private UpdateUserDTO updateDto(String login, String email) {
-        return new UpdateUserDTO("João", "Silva", email, LocalDate.of(1990, 1, 1), login, "senha123", "11999999999");
+        return new UpdateUserDTO("João", "Silva", email, LocalDate.of(1990, 1, 1), login, "senha123", "11999999999", null);
     }
 }

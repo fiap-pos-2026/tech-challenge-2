@@ -23,5 +23,7 @@
     <include file="changes/017-add-returnable-to-products.xml"     relativeToChangelogFile="true"/>
     <include file="changes/018-add-cost-to-rework-cycles.xml"      relativeToChangelogFile="true"/>
     <include file="changes/019-add-notes-to-stock-movements.xml"   relativeToChangelogFile="true"/>
+    <include file="changes/020-add-password-temporaria-to-users.xml" relativeToChangelogFile="true"/>
+    <include file="changes/021-seed-admin-user.xml"                  relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -36,10 +37,10 @@ public class NotificationController {
 
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "List notifications for the authenticated user (paginated)", operationId = "list-notifications")
-    @PreAuthorize("hasAnyRole('ATTENDANT', 'MECHANIC')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT', 'MECHANIC')")
     public ResponseEntity<Page<NotificationResponse>> listNotifications(
             @AuthenticationPrincipal UserDetailsImpl principal,
-            @PageableDefault(size = 20) Pageable pageable) {
+            @ParameterObject @PageableDefault(size = 20) Pageable pageable) {
         return ResponseEntity.ok(notificationService.listByUser(principal.getId(), pageable).map(mapper::toResponse));
     }
 
@@ -51,7 +52,7 @@ public class NotificationController {
             required = true,
             content = @Content(schema = @Schema(implementation = UUID.class))
     )
-    @PreAuthorize("hasAnyRole('ATTENDANT', 'MECHANIC')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT', 'MECHANIC')")
     public ResponseEntity<NotificationResponse> markAsRead(@PathVariable UUID uuid,
                                                            @AuthenticationPrincipal UserDetailsImpl principal) {
         return ResponseEntity.ok(mapper.toResponse(notificationService.markAsRead(uuid, principal.getId())));
