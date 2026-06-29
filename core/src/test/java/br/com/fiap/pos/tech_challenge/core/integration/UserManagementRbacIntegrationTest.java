@@ -59,8 +59,8 @@ class UserManagementRbacIntegrationTest {
 
     private static final String PASSWORD = "Test@123";
 
-    private Long adminId;
-    private Long attendantId;
+    private UUID adminUuid;
+    private UUID attendantUuid;
     private String adminToken;
     private String attendantToken;
 
@@ -84,7 +84,7 @@ class UserManagementRbacIntegrationTest {
         admin.setPhone("11900000001");
         admin.setRole(UserRole.ADMIN);
         admin.setActive(true);
-        adminId = userRepository.save(admin).getId();
+        adminUuid = userRepository.save(admin).getUuid();
 
         User attendant = new User();
         attendant.setFirstName("Attendant");
@@ -96,7 +96,7 @@ class UserManagementRbacIntegrationTest {
         attendant.setPhone("11900000002");
         attendant.setRole(UserRole.ATTENDANT);
         attendant.setActive(true);
-        attendantId = userRepository.save(attendant).getId();
+        attendantUuid = userRepository.save(attendant).getUuid();
 
         adminToken = login(admin.getLogin());
         attendantToken = login(attendant.getLogin());
@@ -133,28 +133,28 @@ class UserManagementRbacIntegrationTest {
 
     @Test
     void deleteLastAdmin_returns409() throws Exception {
-        mockMvc.perform(delete("/api/users/" + adminId)
+        mockMvc.perform(delete("/api/users/" + adminUuid)
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isConflict());
     }
 
     @Test
     void deleteNonAdminUser_withAdminToken_returns204() throws Exception {
-        mockMvc.perform(delete("/api/users/" + attendantId)
+        mockMvc.perform(delete("/api/users/" + attendantUuid)
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isNoContent());
     }
 
     @Test
     void adminSelfRoleChange_returns422() throws Exception {
-        User admin = userRepository.findById(adminId).orElseThrow();
+        User admin = userRepository.findByUuid(adminUuid).orElseThrow();
         String body = """
                 {"firstName":"%s","lastName":"%s","email":"%s",
                  "birthday":"1990-01-01","login":"%s","password":"Test@123",
                  "phone":"11900000001","role":"ATTENDANT"}
                 """.formatted(admin.getFirstName(), admin.getLastName(), admin.getEmail(), admin.getLogin());
 
-        mockMvc.perform(put("/api/users/" + adminId)
+        mockMvc.perform(put("/api/users/" + adminUuid)
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))

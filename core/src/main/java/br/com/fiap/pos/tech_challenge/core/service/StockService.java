@@ -30,6 +30,15 @@ public class StockService {
     private final ProductRepository productRepository;
     private final StockMovementRepository stockMovementRepository;
 
+    @Transactional(readOnly = true)
+    public void checkAvailability(UUID productUuid, BigDecimal quantity) {
+        Product product = productRepository.findByUuid(productUuid)
+                .orElseThrow(ProductNotFoundException::new);
+        if (product.getAvailableQuantity().compareTo(quantity) < 0) {
+            throw new InsufficientStockException();
+        }
+    }
+
     @Transactional
     public void debit(UUID productUuid, BigDecimal quantity, ServiceOrder serviceOrder, User user) {
         Product product = productRepository.findByUuidForUpdate(productUuid)

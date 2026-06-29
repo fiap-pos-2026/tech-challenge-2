@@ -18,6 +18,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/users")
@@ -37,20 +38,20 @@ public class UserController {
         return ResponseEntity.ok(service.findAll());
     }
 
-    @GetMapping(path = "/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
+    @GetMapping(path = "/{uuid}", produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(
-            summary = "API to find a user by it's id.",
-            operationId = "find-by-id"
+            summary = "API to find a user by it's uuid.",
+            operationId = "find-by-uuid"
     )
     @Parameter(
-            name = "id",
-            description = "The user's id.",
+            name = "uuid",
+            description = "The user's uuid.",
             required = true,
-            content = @Content(schema = @Schema(implementation = Long.class))
+            content = @Content(schema = @Schema(implementation = UUID.class))
     )
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<UserDTO> findById(@PathVariable final Long id) {
-        return ResponseEntity.ok(service.findById(id));
+    public ResponseEntity<UserDTO> findByUuid(@PathVariable final UUID uuid) {
+        return ResponseEntity.ok(service.findByUuid(uuid));
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -62,28 +63,28 @@ public class UserController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<UserDTO> create(@RequestBody @Valid final CreateUserDTO dto) {
         final var created = service.create(dto);
-        return ResponseEntity.created(WebUtility.getLocation(created.id())).body(created);
+        return ResponseEntity.created(WebUtility.getLocation(created.uuid())).body(created);
     }
 
-    @DeleteMapping(path = "/{id}")
+    @DeleteMapping(path = "/{uuid}")
     @Operation(
-            summary = "API to delete a user by it's id.",
+            summary = "API to delete a user by it's uuid.",
             operationId = "delete-user"
     )
     @Parameter(
-            name = "id",
-            description = "The user's id.",
+            name = "uuid",
+            description = "The user's uuid.",
             required = true,
-            content = @Content(schema = @Schema(implementation = Long.class))
+            content = @Content(schema = @Schema(implementation = UUID.class))
     )
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> delete(@PathVariable final Long id) {
-        service.deleteById(id);
+    public ResponseEntity<Void> delete(@PathVariable final UUID uuid) {
+        service.deleteByUuid(uuid);
         return ResponseEntity.noContent().build();
     }
 
     @PutMapping(
-            path = "/{id}",
+            path = "/{uuid}",
             consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE
     )
@@ -93,14 +94,14 @@ public class UserController {
             operationId = "update-user"
     )
     @Parameter(
-            name = "id",
-            description = "The user's id.",
+            name = "uuid",
+            description = "The user's uuid.",
             required = true,
-            content = @Content(schema = @Schema(implementation = Long.class))
+            content = @Content(schema = @Schema(implementation = UUID.class))
     )
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<UserDTO> update(@PathVariable final Long id,
+    public ResponseEntity<UserDTO> update(@PathVariable final UUID uuid,
                                           @RequestBody @Valid final UpdateUserDTO dto) {
-        return ResponseEntity.ok(service.update(id, dto));
+        return ResponseEntity.ok(service.update(uuid, dto));
     }
 }

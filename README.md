@@ -192,6 +192,14 @@ Todos os eventos críticos são registrados em `security_audit_log`:
 
 ---
 
+## Relatórios de segurança
+
+| Relatório | Localização |
+|---|---|
+| Análise de vulnerabilidades da imagem Docker (Trivy) | [`reports/security/`](reports/security/README.md) |
+
+---
+
 ## Justificativa da escolha do banco de dados
 
 O PostgreSQL 16 foi escolhido pelas seguintes razões:

@@ -47,7 +47,8 @@ public enum EApplicationError {
     ADMIN_SELF_ROLE_CHANGE_NOT_ALLOWED("error.admin_self_role_change_not_allowed", 33, HttpStatus.UNPROCESSABLE_CONTENT),
     PASSWORD_CHANGE_REQUIRED("error.password_change_required", 34, HttpStatus.FORBIDDEN),
     WRONG_CURRENT_PASSWORD("error.wrong_current_password", 35, HttpStatus.BAD_REQUEST),
-    SAME_PASSWORD("error.same_password", 36, HttpStatus.UNPROCESSABLE_CONTENT);
+    SAME_PASSWORD("error.same_password", 36, HttpStatus.UNPROCESSABLE_CONTENT),
+    TOKEN_BLACKLISTED("error.token_blacklisted", 37, HttpStatus.UNAUTHORIZED);
 
     private static final Map<Integer, EApplicationError> BY_ERROR_CODE = new HashMap<>();
 

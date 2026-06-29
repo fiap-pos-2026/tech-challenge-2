@@ -31,7 +31,8 @@ public class PasswordChangeRequiredFilter extends OncePerRequestFilter {
     // Rotas liberadas enquanto o usuário ainda não trocou a senha
     private static final Set<String> ALLOWED_PATHS = Set.of(
             "/api/profile/password",  // PUT — troca de senha
-            "/api/profile"            // GET — dados do usuário logado (necessário para UI)
+            "/api/profile",           // GET — dados do usuário logado (necessário para UI)
+            "/api/signout"            // POST — logout sempre acessível (FR-011)
     );
 
     private final Translator translator;

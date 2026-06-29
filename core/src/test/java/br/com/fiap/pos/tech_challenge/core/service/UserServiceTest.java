@@ -24,6 +24,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -90,22 +91,24 @@ class UserServiceTest {
         assertThat(sut.findAll()).hasSize(1);
     }
 
-    // ---- findById ----
+    // ---- findByUuid ----
 
     @Test
-    void findById_returnsDTO() {
+    void findByUuid_returnsDTO() {
+        UUID uuid = UUID.randomUUID();
         User user = user("a");
-        when(repository.findById(1L)).thenReturn(Optional.of(user));
+        when(repository.findByUuid(uuid)).thenReturn(Optional.of(user));
         when(mapper.toDTO(user)).thenReturn(userDTO());
 
-        assertThat(sut.findById(1L)).isNotNull();
+        assertThat(sut.findByUuid(uuid)).isNotNull();
     }
 
     @Test
-    void findById_throwsWhenNotFound() {
-        when(repository.findById(99L)).thenReturn(Optional.empty());
+    void findByUuid_throwsWhenNotFound() {
+        UUID uuid = UUID.randomUUID();
+        when(repository.findByUuid(uuid)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> sut.findById(99L))
+        assertThatThrownBy(() -> sut.findByUuid(uuid))
                 .isInstanceOf(CoreException.class);
     }
 
@@ -146,23 +149,26 @@ class UserServiceTest {
                 .isInstanceOf(CoreException.class);
     }
 
-    // ---- deleteById ----
+    // ---- deleteByUuid ----
 
     @Test
-    void deleteById_removesWhenExists() {
+    void deleteByUuid_removesWhenExists() {
+        UUID uuid = UUID.randomUUID();
         User target = user("atendente");
-        when(repository.findById(1L)).thenReturn(Optional.of(target));
+        target.setId(1L);
+        when(repository.findByUuid(uuid)).thenReturn(Optional.of(target));
 
-        sut.deleteById(1L);
+        sut.deleteByUuid(uuid);
 
         verify(repository).deleteById(1L);
     }
 
     @Test
-    void deleteById_throwsWhenNotFound() {
-        when(repository.findById(99L)).thenReturn(Optional.empty());
+    void deleteByUuid_throwsWhenNotFound() {
+        UUID uuid = UUID.randomUUID();
+        when(repository.findByUuid(uuid)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> sut.deleteById(99L))
+        assertThatThrownBy(() -> sut.deleteByUuid(uuid))
                 .isInstanceOf(CoreException.class);
     }
 
@@ -170,46 +176,48 @@ class UserServiceTest {
 
     @Test
     void update_appliesChangesAndReturns() {
-        Long id = 1L;
+        UUID uuid = UUID.randomUUID();
         User current = user("joao");
-        // use different email so existsByEmailIgnoreCase is checked
+        current.setId(1L);
         UpdateUserDTO dto = updateDto("joao", "novo@mail.com");
         UserDTO resp = userDTO();
 
-        when(repository.findById(id)).thenReturn(Optional.of(current));
+        when(repository.findByUuid(uuid)).thenReturn(Optional.of(current));
         when(repository.existsByEmailIgnoreCase("novo@mail.com")).thenReturn(false);
         when(mapper.fullUpdate(dto, current)).thenReturn(current);
         when(repository.save(current)).thenReturn(current);
         when(mapper.toDTO(current)).thenReturn(resp);
 
-        assertThat(sut.update(id, dto)).isEqualTo(resp);
+        assertThat(sut.update(uuid, dto)).isEqualTo(resp);
     }
 
     @Test
     void update_throwsWhenLoginTakenByOther() {
-        Long id = 1L;
+        UUID uuid = UUID.randomUUID();
         User current = user("joao");
         current.setLogin("joao");
+        current.setId(1L);
         UpdateUserDTO dto = updateDto("pedro", "joao@mail.com");
 
-        when(repository.findById(id)).thenReturn(Optional.of(current));
+        when(repository.findByUuid(uuid)).thenReturn(Optional.of(current));
         when(repository.existsByLoginIgnoreCase("pedro")).thenReturn(true);
 
-        assertThatThrownBy(() -> sut.update(id, dto))
+        assertThatThrownBy(() -> sut.update(uuid, dto))
                 .isInstanceOf(CoreException.class);
     }
 
     @Test
     void update_throwsWhenEmailTakenByOther() {
-        Long id = 1L;
+        UUID uuid = UUID.randomUUID();
         User current = user("joao");
         current.setEmail("joao@antigo.com");
+        current.setId(1L);
         UpdateUserDTO dto = updateDto("joao", "outro@mail.com");
 
-        when(repository.findById(id)).thenReturn(Optional.of(current));
+        when(repository.findByUuid(uuid)).thenReturn(Optional.of(current));
         when(repository.existsByEmailIgnoreCase("outro@mail.com")).thenReturn(true);
 
-        assertThatThrownBy(() -> sut.update(id, dto))
+        assertThatThrownBy(() -> sut.update(uuid, dto))
                 .isInstanceOf(CoreException.class);
     }
 

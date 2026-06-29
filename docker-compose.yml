@@ -16,6 +16,18 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: tech-challenge-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --save ""
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   mailpit:
     image: axllent/mailpit:latest
     container_name: tech-challenge-mailpit
@@ -41,6 +53,8 @@ services:
       JWT_PRIVATE_KEY: file:/run/certs/dev-private.pem
       MAIL_HOST: mailpit
       MAIL_PORT: 1025
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       # ADMIN_INITIAL_PASSWORD: "SenhaForte@2026!"   # opcional — gerada aleatoriamente se omitida
     volumes:
       - ./core/src/main/resources/certs:/run/certs:ro
@@ -52,6 +66,8 @@ services:
       retries: 3
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       mailpit:
         condition: service_started

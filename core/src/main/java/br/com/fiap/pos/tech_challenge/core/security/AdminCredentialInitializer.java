@@ -16,11 +16,6 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Inicializa a senha do administrador padrão na primeira execução da aplicação.
- * Se ADMIN_INITIAL_PASSWORD não for definido, gera uma senha aleatória segura
- * e a imprime nos ‘logs’. Em ambos os casos a senha só é aplicada enquanto a
- * ‘flag’ force_change_password estiver ativo — ou seja, somente antes do
- * primeiro ‘login’ do admin.
  * @author pauloogsouza
  * @since 2026-06-28
  */
@@ -69,7 +64,6 @@ public class AdminCredentialInitializer implements ApplicationRunner {
 
         List<Character> chars = new ArrayList<>(16);
 
-        // garante pelo menos 2 de cada categoria exigida pelo regex de senha
         chars.add(upper.charAt(random.nextInt(upper.length())));
         chars.add(upper.charAt(random.nextInt(upper.length())));
         chars.add(lower.charAt(random.nextInt(lower.length())));

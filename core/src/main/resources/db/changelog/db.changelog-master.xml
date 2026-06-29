@@ -25,5 +25,7 @@
     <include file="changes/019-add-notes-to-stock-movements.xml"   relativeToChangelogFile="true"/>
     <include file="changes/020-add-password-temporaria-to-users.xml" relativeToChangelogFile="true"/>
     <include file="changes/021-seed-admin-user.xml"                  relativeToChangelogFile="true"/>
+    <include file="changes/022-add-not-null-to-users-uuid.xml"       relativeToChangelogFile="true"/>
+    <include file="changes/023-drop-not-null-stock-movements-user-id.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

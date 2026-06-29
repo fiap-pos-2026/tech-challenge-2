@@ -32,8 +32,8 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long
             SELECT so FROM ServiceOrder so
             WHERE (:status IS NULL OR so.status = :status)
               AND (:customerUuid IS NULL OR so.customer.uuid = :customerUuid)
-              AND (:from IS NULL OR so.createdAt >= :from)
-              AND (:to IS NULL OR so.createdAt <= :to)
+              AND (CAST(:from AS TIMESTAMP) IS NULL OR so.createdAt >= :from)
+              AND (CAST(:to AS TIMESTAMP) IS NULL OR so.createdAt <= :to)
             """)
     Page<ServiceOrder> findWithFilters(
             @Param("status") ServiceOrderStatus status,

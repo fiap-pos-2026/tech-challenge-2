@@ -94,7 +94,6 @@ public class OTPService {
 
         if (!documentMatch || !tokenMatch) {
             token.setInvalidAttempts(token.getInvalidAttempts() + 1);
-            // 6ª tentativa inválida invalida o token (5ª ainda valida — FR-031)
             if (token.getInvalidAttempts() > MAX_INVALID_ATTEMPTS) {
                 token.setInvalidatedAt(Instant.now());
                 notificationService.publishToRole(

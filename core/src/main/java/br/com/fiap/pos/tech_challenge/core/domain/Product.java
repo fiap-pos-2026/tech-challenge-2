@@ -51,7 +51,6 @@ public class Product {
     @Column(name = "_unit_price", nullable = false, precision = 15, scale = 2)
     private BigDecimal unitPrice;
 
-    // CHECK >= 0 enforced by Flyway schema constraint
     @Column(name = "_available_quantity", nullable = false, precision = 15, scale = 4)
     private BigDecimal availableQuantity;
 

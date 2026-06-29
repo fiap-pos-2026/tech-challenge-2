@@ -61,9 +61,6 @@ public class ServiceOrderService {
     private final UserRepository userRepository;
     private final ServiceOrderMapper mapper;
 
-    // -----------------------------------------------------------------------
-    // T059 — openServiceOrder
-    // -----------------------------------------------------------------------
     @Transactional
     public ServiceOrderResponse openServiceOrder(UUID customerUuid, UUID vehicleUuid,
                                                   String customerComplaint) {
@@ -83,9 +80,6 @@ public class ServiceOrderService {
         return buildResponse(serviceOrderRepository.save(so));
     }
 
-    // -----------------------------------------------------------------------
-    // T060 — startDiagnosis
-    // -----------------------------------------------------------------------
     @Transactional
     public ServiceOrderResponse startDiagnosis(UUID osUuid) {
         ServiceOrder so = findServiceOrder(osUuid);
@@ -95,7 +89,6 @@ public class ServiceOrderService {
     }
 
     // -----------------------------------------------------------------------
-    // T061 — addServiceToDiagnosis
     // -----------------------------------------------------------------------
     @Transactional
     public ServiceOrderResponse addServiceToDiagnosis(UUID osUuid, UUID mechanicalServiceUuid) {
@@ -114,13 +107,12 @@ public class ServiceOrderService {
         line.setPriceSnapshot(ms.getBasePrice());
         line.setEstimatedDurationMinutes(ms.getEstimatedDurationMinutes());
         quote.getServiceLines().add(line);
-
+        quote.setTotalAmount(calculateTotal(quote));
         quoteRepository.save(quote);
         return buildResponse(so);
     }
 
     // -----------------------------------------------------------------------
-    // T061b — removeServiceFromDiagnosis
     // -----------------------------------------------------------------------
     @Transactional
     public ServiceOrderResponse removeServiceFromDiagnosis(UUID osUuid, UUID mechanicalServiceUuid) {
@@ -141,7 +133,6 @@ public class ServiceOrderService {
     }
 
     // -----------------------------------------------------------------------
-    // T062 — addProductToDiagnosis
     // -----------------------------------------------------------------------
     @Transactional
     public ServiceOrderResponse addProductToDiagnosis(UUID osUuid, UUID productUuid, BigDecimal quantity) {
@@ -150,6 +141,14 @@ public class ServiceOrderService {
 
         Product product = productRepository.findByUuid(productUuid)
                 .orElseThrow(ProductNotFoundException::new);
+
+        try {
+            stockService.checkAvailability(productUuid, quantity);
+        } catch (InsufficientStockException e) {
+            notificationService.publishInsufficientStockNotification(
+                    "Estoque insuficiente do produto " + productUuid + " na OS " + osUuid + ".", so);
+            throw e;
+        }
 
         Quote quote = getOrCreateProvisionalQuote(so);
 
@@ -162,13 +161,32 @@ public class ServiceOrderService {
         line.setMeasurementUnit(product.getMeasurementUnit());
         line.setUnbudgeted(false);
         quote.getProductLines().add(line);
-
+        quote.setTotalAmount(calculateTotal(quote));
         quoteRepository.save(quote);
         return buildResponse(so);
     }
 
     // -----------------------------------------------------------------------
-    // T063 — completeDiagnosis
+    // -----------------------------------------------------------------------
+    @Transactional
+    public ServiceOrderResponse removeProductFromDiagnosis(UUID osUuid, UUID productUuid) {
+        ServiceOrder so = findServiceOrder(osUuid);
+        requireStatus(so, ServiceOrderStatus.IN_DIAGNOSIS);
+
+        Quote quote = getOrCreateProvisionalQuote(so);
+        boolean removed = quote.getProductLines().removeIf(
+                line -> line.getProduct().getUuid().equals(productUuid));
+
+        if (!removed) {
+            throw new ProductNotFoundException();
+        }
+
+        quote.setTotalAmount(calculateTotal(quote));
+        quoteRepository.save(quote);
+        return buildResponse(so);
+    }
+
+    // -----------------------------------------------------------------------
     // -----------------------------------------------------------------------
     @Transactional
     public ServiceOrderResponse completeDiagnosis(UUID osUuid) {
@@ -188,7 +206,6 @@ public class ServiceOrderService {
     }
 
     // -----------------------------------------------------------------------
-    // T064 — approveQuote
     // -----------------------------------------------------------------------
     @Transactional
     public ServiceOrderResponse approveQuote(UUID osUuid, String customerDocument, String tokenRaw) {
@@ -198,15 +215,33 @@ public class ServiceOrderService {
         requireStatus(so, ServiceOrderStatus.AWAITING_APPROVAL);
 
         Quote quote = latestQuote(so);
-        List<QuoteProductLine> unbudgeted = quote.getProductLines().stream()
-                .filter(QuoteProductLine::isUnbudgeted).toList();
+        boolean firstApproval = quote.getApprovedAt() == null;
 
-        unbudgeted.forEach(l -> l.setUnbudgeted(false));
+        if (!firstApproval) {
+            quote.getProductLines()
+                    .stream()
+                    .filter(QuoteProductLine::isUnbudgeted)
+                    .forEach(l -> l.setUnbudgeted(false));
+        }
+
         quote.setApprovedAt(Instant.now());
         quoteRepository.save(quote);
 
         so.setStatus(ServiceOrderStatus.IN_PROGRESS);
         ServiceOrder saved = serviceOrderRepository.save(so);
+
+        if (firstApproval) {
+            for (QuoteProductLine line : quote.getProductLines()) {
+                if (line.isUnbudgeted()) continue;
+                try {
+                    stockService.debit(line.getProduct().getUuid(), line.getQuantity(), saved, null);
+                } catch (InsufficientStockException _) {
+                    notificationService.publishInsufficientStockNotification(
+                            "Estoque insuficiente do produto " + line.getProduct().getUuid()
+                                    + " na OS " + osUuid + ".", saved);
+                }
+            }
+        }
 
         notificationService.publishToRole(UserRole.MECHANIC, NotificationType.ORDER_APPROVED,
                 "OS " + osUuid + " aprovada pelo cliente.", saved);
@@ -215,7 +250,6 @@ public class ServiceOrderService {
     }
 
     // -----------------------------------------------------------------------
-    // T065 — rejectQuote
     // -----------------------------------------------------------------------
     @Transactional
     public ServiceOrderResponse rejectQuote(UUID osUuid, String customerDocument, String tokenRaw,
@@ -255,7 +289,6 @@ public class ServiceOrderService {
     }
 
     // -----------------------------------------------------------------------
-    // T066 — resendOTP
     // -----------------------------------------------------------------------
     @Transactional
     public void resendOTP(UUID osUuid) {
@@ -269,14 +302,16 @@ public class ServiceOrderService {
     }
 
     // -----------------------------------------------------------------------
-    // T067 — requestProduct
     // -----------------------------------------------------------------------
     @Transactional
     public ServiceOrderResponse requestProduct(UUID osUuid, UUID productUuid,
                                                 BigDecimal quantity, UserDetailsImpl principal) {
         ServiceOrder so = findServiceOrder(osUuid);
-        if (so.getStatus() != ServiceOrderStatus.IN_PROGRESS
-                && so.getStatus() != ServiceOrderStatus.AWAITING_APPROVAL) {
+
+        boolean isAddendumPhase = so.getStatus() == ServiceOrderStatus.AWAITING_APPROVAL
+                && latestQuote(so).getApprovedAt() != null;
+
+        if (so.getStatus() != ServiceOrderStatus.IN_PROGRESS && !isAddendumPhase) {
             throw new InvalidStatusTransitionException();
         }
 
@@ -294,45 +329,29 @@ public class ServiceOrderService {
 
         Quote quote = latestQuote(so);
 
-        boolean alreadyBudgeted = quote.getProductLines().stream()
-                .filter(l -> !l.isUnbudgeted())
-                .anyMatch(l -> l.getProduct().getUuid().equals(productUuid));
+        QuoteProductLine line = new QuoteProductLine();
+        line.setQuote(quote);
+        line.setProduct(product);
+        line.setNameSnapshot(product.getName());
+        line.setUnitPriceSnapshot(product.getUnitPrice());
+        line.setQuantity(quantity);
+        line.setMeasurementUnit(product.getMeasurementUnit());
+        line.setUnbudgeted(true);
+        quote.getProductLines().add(line);
+        quote.setTotalAmount(calculateTotal(quote));
+        quoteRepository.save(quote);
 
-        if (!alreadyBudgeted) {
-            QuoteProductLine line = new QuoteProductLine();
-            line.setQuote(quote);
-            line.setProduct(product);
-            line.setNameSnapshot(product.getName());
-            line.setUnitPriceSnapshot(product.getUnitPrice());
-            line.setQuantity(quantity);
-            line.setMeasurementUnit(product.getMeasurementUnit());
-            line.setUnbudgeted(true);
-            quote.getProductLines().add(line);
-            quote.setTotalAmount(calculateTotal(quote));
-            quoteRepository.save(quote);
-
-            if (so.getStatus() == ServiceOrderStatus.IN_PROGRESS) {
-                so.setStatus(ServiceOrderStatus.AWAITING_APPROVAL);
-                so.setApprovalExpiresAt(Instant.now().plus(APPROVAL_WINDOW_HOURS, ChronoUnit.HOURS));
-                so = serviceOrderRepository.save(so);
-                otpService.generateAndSend(so);
-            }
-        } else {
-            QuoteProductLine existing = quote.getProductLines().stream()
-                    .filter(l -> !l.isUnbudgeted())
-                    .filter(l -> l.getProduct().getUuid().equals(productUuid))
-                    .findFirst()
-                    .orElseThrow(ProductNotFoundException::new);
-            existing.setQuantity(existing.getQuantity().add(quantity));
-            quote.setTotalAmount(calculateTotal(quote));
-            quoteRepository.save(quote);
+        if (so.getStatus() == ServiceOrderStatus.IN_PROGRESS) {
+            so.setStatus(ServiceOrderStatus.AWAITING_APPROVAL);
+            so.setApprovalExpiresAt(Instant.now().plus(APPROVAL_WINDOW_HOURS, ChronoUnit.HOURS));
+            so = serviceOrderRepository.save(so);
+            otpService.generateAndSend(so);
         }
 
         return buildResponse(so);
     }
 
     // -----------------------------------------------------------------------
-    // T068 — returnProduct
     // -----------------------------------------------------------------------
     @Transactional
     public ServiceOrderResponse returnProduct(UUID osUuid, UUID productUuid,
@@ -362,7 +381,6 @@ public class ServiceOrderService {
     }
 
     // -----------------------------------------------------------------------
-    // T069 — completeExecution
     // -----------------------------------------------------------------------
     @Transactional
     public ServiceOrderResponse completeExecution(UUID osUuid) {
@@ -377,7 +395,6 @@ public class ServiceOrderService {
     }
 
     // -----------------------------------------------------------------------
-    // T070 — acceptDelivery
     // -----------------------------------------------------------------------
     @Transactional
     public ServiceOrderResponse acceptDelivery(UUID osUuid, String customerDocument,
@@ -394,7 +411,6 @@ public class ServiceOrderService {
     }
 
     // -----------------------------------------------------------------------
-    // T071 — rejectDelivery
     // -----------------------------------------------------------------------
     @Transactional
     public ServiceOrderResponse rejectDelivery(UUID osUuid, String customerDocument,
@@ -429,7 +445,6 @@ public class ServiceOrderService {
     }
 
     // -----------------------------------------------------------------------
-    // T072 — closeDispute
     // -----------------------------------------------------------------------
     @Transactional
     public ServiceOrderResponse closeDispute(UUID osUuid, String resolution, UserDetailsImpl principal) {
@@ -454,7 +469,6 @@ public class ServiceOrderService {
     }
 
     // -----------------------------------------------------------------------
-    // T073 — getServiceOrder / listServiceOrders
     // -----------------------------------------------------------------------
     @Transactional(readOnly = true)
     public ServiceOrderStatusResponse getServiceOrderStatus(UUID osUuid) {

@@ -129,6 +129,20 @@ public class ServiceOrderController {
         return ResponseEntity.ok(service.addProductToDiagnosis(uuid, request.productUuid(), request.quantity()));
     }
 
+    @DeleteMapping(path = "/{uuid}/diagnosis/products/{productUuid}",
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "Remove a product from the diagnosis", operationId = "remove-product-from-diagnosis")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Product removed, quote recalculated"),
+            @ApiResponse(responseCode = "404", description = "Product not found in diagnosis"),
+            @ApiResponse(responseCode = "409", description = "Service order is not in IN_DIAGNOSIS status")
+    })
+    @PreAuthorize("hasAnyRole('ADMIN', 'MECHANIC')")
+    public ResponseEntity<ServiceOrderResponse> removeProductFromDiagnosis(@PathVariable UUID uuid,
+                                                                            @PathVariable UUID productUuid) {
+        return ResponseEntity.ok(service.removeProductFromDiagnosis(uuid, productUuid));
+    }
+
     @PostMapping(path = "/{uuid}/diagnosis/complete", produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Complete the diagnosis and generate a quote", operationId = "complete-diagnosis")
     @ApiResponses({

@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -36,6 +37,7 @@ public class TokenUtility {
                 .issuedAt(currentInstant)
                 .expiresAt(currentInstant.plus(expiryTime))
                 .subject(impl.getLogin())
+                .id(UUID.randomUUID().toString())
                 .claim("id", impl.getId())
                 .claim("first_name", impl.getFirstName())
                 .claim("last_name", impl.getLastName())
@@ -68,6 +70,16 @@ public class TokenUtility {
 
     public String getClaim(final String token, final String claim) {
         return this.decode(token).getClaimAsString(claim);
+    }
+
+    public String getJti(final String token) {
+        return this.decode(token).getId();
+    }
+
+    public long getRemainingTtlSeconds(final String token) {
+        Instant expiresAt = this.decode(token).getExpiresAt();
+        if (expiresAt == null) return 0;
+        return Math.max(0, Duration.between(Instant.now(), expiresAt).getSeconds());
     }
 
     /**

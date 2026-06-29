@@ -10,6 +10,9 @@
             <column name="_id" type="BIGINT" autoIncrement="true">
                 <constraints primaryKey="true" nullable="false"/>
             </column>
+            <column name="_uuid" type="UUID">
+                <constraints unique="true" uniqueConstraintName="uq_users_uuid"/>
+            </column>
             <column name="_first_name" type="VARCHAR(255)">
                 <constraints nullable="false"/>
             </column>
@@ -37,9 +40,6 @@
             <column name="_last_login" type="TIMESTAMP"/>
             <column name="_hash" type="VARCHAR(64)">
                 <constraints nullable="false"/>
-            </column>
-            <column name="_uuid" type="UUID">
-                <constraints unique="true" uniqueConstraintName="uq_users_uuid"/>
             </column>
             <column name="_role" type="VARCHAR(20)"/>
         </createTable>

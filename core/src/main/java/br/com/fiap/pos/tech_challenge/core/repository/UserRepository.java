@@ -9,11 +9,14 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByLogin(String login);
+
+    Optional<User> findByUuid(UUID uuid);
 
     @Query("UPDATE User u SET u.lastLogin = current_timestamp WHERE u.id = ?1")
     @Modifying

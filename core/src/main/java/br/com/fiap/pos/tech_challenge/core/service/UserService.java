@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -56,8 +57,8 @@ public class UserService implements UserDetailsService {
     }
 
     @Transactional(readOnly = true)
-    public UserDTO findById(Long id) {
-        return repository.findById(id)
+    public UserDTO findByUuid(UUID uuid) {
+        return repository.findByUuid(uuid)
                 .map(mapper::toDTO)
                 .orElseThrow(() -> new CoreException(EApplicationError.USER_NOT_FOUND));
     }
@@ -90,15 +91,15 @@ public class UserService implements UserDetailsService {
     }
 
     @Transactional
-    public void deleteById(final Long id) {
-        User target = repository.findById(id)
+    public void deleteByUuid(final UUID uuid) {
+        User target = repository.findByUuid(uuid)
                 .orElseThrow(() -> new CoreException(EApplicationError.USER_NOT_FOUND));
 
         if (target.getRole() == UserRole.ADMIN && repository.countByRole(UserRole.ADMIN) == 1) {
             throw new CoreException(EApplicationError.LAST_ADMIN_DELETION_NOT_ALLOWED);
         }
 
-        repository.deleteById(id);
+        repository.deleteById(target.getId());
 
         UserDetailsImpl loggedUser = AuthUtility.getLoggedUser();
         auditLogService.register(AuditEventType.USER_DELETED, loggedUser, target.getLogin(), "SUCCESS",
@@ -106,12 +107,12 @@ public class UserService implements UserDetailsService {
     }
 
     @Transactional
-    public UserDTO update(final Long id, final UpdateUserDTO dto) {
-        User current = repository.findById(id)
+    public UserDTO update(final UUID uuid, final UpdateUserDTO dto) {
+        User current = repository.findByUuid(uuid)
                 .orElseThrow(() -> new CoreException(EApplicationError.USER_NOT_FOUND));
 
         UserDetailsImpl loggedUser = AuthUtility.getLoggedUser();
-        if (loggedUser.getId().equals(id)
+        if (loggedUser.getId().equals(current.getId())
                 && loggedUser.getRole() == UserRole.ADMIN
                 && dto.role() != null
                 && dto.role() != UserRole.ADMIN) {
@@ -146,7 +147,6 @@ public class UserService implements UserDetailsService {
         User user = repository.findById(userId)
                 .orElseThrow(() -> new CoreException(EApplicationError.USER_NOT_FOUND));
 
-        // OWASP A07 — bloqueia após tentativas repetidas de senha atual errada
         if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(LocalDateTime.now())) {
             throw new CoreException(EApplicationError.ACCOUNT_LOCKED);
         }
@@ -163,7 +163,6 @@ public class UserService implements UserDetailsService {
             throw new CoreException(EApplicationError.WRONG_CURRENT_PASSWORD);
         }
 
-        // OWASP A07 — impede reutilização imediata da senha atual
         if (passwordEncoder.matches(dto.novaSenha(), user.getPassword())) {
             throw new CoreException(EApplicationError.SAME_PASSWORD);
         }

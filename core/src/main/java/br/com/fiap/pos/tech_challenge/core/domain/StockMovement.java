@@ -52,7 +52,7 @@ public class StockMovement {
     private BigDecimal referenceUnitPrice;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "_user_id", nullable = false, updatable = false)
+    @JoinColumn(name = "_user_id", updatable = false)
     private User user;
 
     @Column(name = "_notes", columnDefinition = "TEXT", updatable = false)

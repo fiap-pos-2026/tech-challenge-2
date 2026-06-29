@@ -8,6 +8,7 @@ import br.com.fiap.pos.tech_challenge.core.exception.AccountInactiveException;
 import br.com.fiap.pos.tech_challenge.core.exception.AccountLockedException;
 import br.com.fiap.pos.tech_challenge.core.exception.CoreException;
 import br.com.fiap.pos.tech_challenge.core.repository.UserRepository;
+import br.com.fiap.pos.tech_challenge.core.security.TokenBlacklistService;
 import br.com.fiap.pos.tech_challenge.core.security.TokenUtility;
 import br.com.fiap.pos.tech_challenge.core.security.UserDetailsImpl;
 import br.com.fiap.pos.tech_challenge.core.util.TokenDTO;
@@ -38,6 +39,7 @@ public class AuthenticationService {
     private static final int LOCK_DURATION_MINUTES = 15;
 
     private final TokenUtility tokenUtility;
+    private final TokenBlacklistService tokenBlacklistService;
     private final AuthenticationConfiguration configuration;
     private final UserService userService;
     private final UserRepository userRepository;
@@ -101,6 +103,19 @@ public class AuthenticationService {
             handleFailedAttempt(dto.getLogin(), user);
             throw new CoreException(EApplicationError.INVALID_USERNAME_PASSWORD);
         }
+    }
+
+    public void signout(final String token, final UserDetailsImpl user) {
+        String jti = tokenUtility.getJti(token);
+        long ttlSeconds = tokenUtility.getRemainingTtlSeconds(token);
+
+        try {
+            tokenBlacklistService.invalidate(jti, ttlSeconds);
+        } catch (Exception e) {
+            log.error("Falha ao invalidar token na blacklist (fail-open): {}", e.getMessage());
+        }
+
+        auditLogService.register(AuditEventType.LOGOUT_SUCCESS, user, jti, "204", null);
     }
 
     @Transactional

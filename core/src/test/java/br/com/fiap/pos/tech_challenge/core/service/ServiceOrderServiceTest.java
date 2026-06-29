@@ -21,6 +21,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -389,7 +390,41 @@ class ServiceOrderServiceTest {
     }
 
     // -------------------------------------------------------------------------
-    // approveQuote — addendum path clears unbudgeted flag
+    // approveQuote — first approval debits all budgeted products
+    // -------------------------------------------------------------------------
+    @Test
+    void approveQuote_debitsAllBudgetedProductsOnFirstApproval() {
+        UUID uuid = UUID.randomUUID();
+        UUID productUuid = UUID.randomUUID();
+
+        Product product = new Product();
+        product.setUuid(productUuid);
+
+        QuoteProductLine budgeted = new QuoteProductLine();
+        budgeted.setProduct(product);
+        budgeted.setQuantity(new BigDecimal("2"));
+        budgeted.setUnbudgeted(false);
+
+        Quote quote = new Quote();
+        quote.getProductLines().add(budgeted);
+
+        ServiceOrder so = serviceOrderWithStatus(ServiceOrderStatus.AWAITING_APPROVAL);
+        ServiceOrderResponse expected = responseFor(so);
+
+        when(serviceOrderRepository.findByUuid(uuid)).thenReturn(Optional.of(so));
+        when(quoteRepository.findFirstByServiceOrderIdOrderByCreatedAtDesc(any()))
+                .thenReturn(Optional.of(quote));
+        when(quoteRepository.save(any())).thenReturn(quote);
+        when(serviceOrderRepository.save(any())).thenReturn(so);
+        when(mapper.toResponse(any())).thenReturn(expected);
+
+        sut.approveQuote(uuid, "52998224725", "token");
+
+        verify(stockService).debit(eq(productUuid), eq(new BigDecimal("2")), eq(so), isNull());
+    }
+
+    // -------------------------------------------------------------------------
+    // approveQuote — addendum path clears unbudgeted flag, no extra debit
     // -------------------------------------------------------------------------
     @Test
     void approveQuote_clearsUnbudgetedLinesOnAddendum() {
@@ -404,6 +439,7 @@ class ServiceOrderServiceTest {
         unbudgeted.setUnbudgeted(true);
 
         Quote quote = new Quote();
+        quote.setApprovedAt(Instant.now().minusSeconds(3600)); // já foi aprovado antes
         quote.getProductLines().add(unbudgeted);
 
         ServiceOrder so = serviceOrderWithStatus(ServiceOrderStatus.AWAITING_APPROVAL);
@@ -419,7 +455,62 @@ class ServiceOrderServiceTest {
         sut.approveQuote(uuid, "52998224725", "token");
 
         assertThat(unbudgeted.isUnbudgeted()).isFalse();
+        verify(stockService, never()).debit(any(), any(), any(), any());
         verify(quoteRepository).save(quote);
+    }
+
+    // -------------------------------------------------------------------------
+    // approveQuote — unbudgeted line present at first approval is NOT debited again
+    // -------------------------------------------------------------------------
+    @Test
+    void approveQuote_doesNotDebitUnbudgetedLineOnFirstApproval() {
+        UUID uuid = UUID.randomUUID();
+        UUID productUuid = UUID.randomUUID();
+
+        Product product = new Product();
+        product.setUuid(productUuid);
+
+        QuoteProductLine unbudgeted = new QuoteProductLine();
+        unbudgeted.setProduct(product);
+        unbudgeted.setQuantity(new BigDecimal("3"));
+        unbudgeted.setUnbudgeted(true);
+
+        Quote quote = new Quote();
+        quote.getProductLines().add(unbudgeted);
+
+        ServiceOrder so = serviceOrderWithStatus(ServiceOrderStatus.AWAITING_APPROVAL);
+
+        when(serviceOrderRepository.findByUuid(uuid)).thenReturn(Optional.of(so));
+        when(quoteRepository.findFirstByServiceOrderIdOrderByCreatedAtDesc(any()))
+                .thenReturn(Optional.of(quote));
+        when(quoteRepository.save(any())).thenReturn(quote);
+        when(serviceOrderRepository.save(any())).thenReturn(so);
+        when(mapper.toResponse(any())).thenReturn(responseFor(so));
+
+        sut.approveQuote(uuid, "52998224725", "token");
+
+        verify(stockService, never()).debit(any(), any(), any(), any());
+    }
+
+    // -------------------------------------------------------------------------
+    // requestProduct — rejected during initial AWAITING_APPROVAL (quote not yet approved)
+    // -------------------------------------------------------------------------
+    @Test
+    void requestProduct_throwsWhenCalledDuringInitialAwaitingApproval() {
+        UUID osUuid = UUID.randomUUID();
+        UUID productUuid = UUID.randomUUID();
+
+        ServiceOrder so = serviceOrderWithStatus(ServiceOrderStatus.AWAITING_APPROVAL);
+        Quote quote = new Quote(); // approvedAt == null → initial wait
+
+        when(serviceOrderRepository.findByUuid(osUuid)).thenReturn(Optional.of(so));
+        when(quoteRepository.findFirstByServiceOrderIdOrderByCreatedAtDesc(any()))
+                .thenReturn(Optional.of(quote));
+
+        assertThatThrownBy(() -> sut.requestProduct(osUuid, productUuid, BigDecimal.ONE, null))
+                .isInstanceOf(InvalidStatusTransitionException.class);
+
+        verify(stockService, never()).debit(any(), any(), any(), any());
     }
 
     // -------------------------------------------------------------------------
@@ -566,6 +657,77 @@ class ServiceOrderServiceTest {
         when(productRepository.findByUuid(productUuid)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> sut.addProductToDiagnosis(osUuid, productUuid, BigDecimal.ONE))
+                .isInstanceOf(br.com.fiap.pos.tech_challenge.core.exception.ProductNotFoundException.class);
+    }
+
+    @Test
+    void addProductToDiagnosis_throwsAndNotifiesAttendantWhenInsufficientStock() {
+        UUID osUuid = UUID.randomUUID();
+        UUID productUuid = UUID.randomUUID();
+
+        ServiceOrder so = serviceOrderWithStatus(ServiceOrderStatus.IN_DIAGNOSIS);
+        Product product = new Product();
+        product.setName("Óleo 5W30");
+
+        when(serviceOrderRepository.findByUuid(osUuid)).thenReturn(Optional.of(so));
+        when(productRepository.findByUuid(productUuid)).thenReturn(Optional.of(product));
+        doThrow(br.com.fiap.pos.tech_challenge.core.exception.InsufficientStockException.class)
+                .when(stockService).checkAvailability(productUuid, new BigDecimal("10"));
+
+        assertThatThrownBy(() -> sut.addProductToDiagnosis(osUuid, productUuid, new BigDecimal("10")))
+                .isInstanceOf(br.com.fiap.pos.tech_challenge.core.exception.InsufficientStockException.class);
+
+        verify(notificationService).publishInsufficientStockNotification(any(), eq(so));
+        verify(quoteRepository, never()).save(any());
+    }
+
+    // -----------------------------------------------------------------------
+    // removeProductFromDiagnosis
+    // -----------------------------------------------------------------------
+    @Test
+    void removeProductFromDiagnosis_removesLineAndRecalculates() {
+        UUID osUuid = UUID.randomUUID();
+        UUID productUuid = UUID.randomUUID();
+
+        Product product = new Product();
+        product.setUuid(productUuid);
+        product.setUnitPrice(new BigDecimal("10.00"));
+
+        QuoteProductLine line = new QuoteProductLine();
+        line.setProduct(product);
+        line.setQuantity(new BigDecimal("2"));
+        line.setUnitPriceSnapshot(new BigDecimal("10.00"));
+        line.setUnbudgeted(false);
+
+        Quote quote = new Quote();
+        quote.getProductLines().add(line);
+
+        ServiceOrder so = serviceOrderWithStatus(ServiceOrderStatus.IN_DIAGNOSIS);
+
+        when(serviceOrderRepository.findByUuid(osUuid)).thenReturn(Optional.of(so));
+        when(quoteRepository.findFirstByServiceOrderIdOrderByCreatedAtDesc(any())).thenReturn(Optional.of(quote));
+        when(quoteRepository.save(any())).thenReturn(quote);
+        when(mapper.toResponse(so)).thenReturn(responseFor(so));
+
+        sut.removeProductFromDiagnosis(osUuid, productUuid);
+
+        assertThat(quote.getProductLines()).isEmpty();
+        assertThat(quote.getTotalAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+        verify(stockService, never()).debit(any(), any(), any(), any());
+    }
+
+    @Test
+    void removeProductFromDiagnosis_throwsWhenProductNotInQuote() {
+        UUID osUuid = UUID.randomUUID();
+        UUID productUuid = UUID.randomUUID();
+
+        Quote quote = new Quote();
+        ServiceOrder so = serviceOrderWithStatus(ServiceOrderStatus.IN_DIAGNOSIS);
+
+        when(serviceOrderRepository.findByUuid(osUuid)).thenReturn(Optional.of(so));
+        when(quoteRepository.findFirstByServiceOrderIdOrderByCreatedAtDesc(any())).thenReturn(Optional.of(quote));
+
+        assertThatThrownBy(() -> sut.removeProductFromDiagnosis(osUuid, productUuid))
                 .isInstanceOf(br.com.fiap.pos.tech_challenge.core.exception.ProductNotFoundException.class);
     }
 

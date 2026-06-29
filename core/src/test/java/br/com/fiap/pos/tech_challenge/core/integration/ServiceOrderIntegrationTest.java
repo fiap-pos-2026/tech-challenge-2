@@ -118,7 +118,7 @@ class ServiceOrderIntegrationTest extends BaseIntegrationTest {
                 customer.getUuid(), vehicle.getUuid(), "Diagnóstico performance");
 
         serviceOrderService.startDiagnosis(created.uuid());
-        serviceOrderService.completeDiagnosis(created.uuid()); // must complete within 5 s (SC-002)
+        serviceOrderService.completeDiagnosis(created.uuid());
     }
 
     @Test

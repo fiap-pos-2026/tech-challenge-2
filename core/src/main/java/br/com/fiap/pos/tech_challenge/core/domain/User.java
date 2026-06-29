@@ -57,7 +57,7 @@ public class User implements Serializable {
     @Column(name = "_hash", nullable = false)
     private String hash;
 
-    @Column(name = "_uuid", unique = true)
+    @Column(name = "_uuid", nullable = false, unique = true, updatable = false)
     private UUID uuid;
 
     @Enumerated(EnumType.STRING)

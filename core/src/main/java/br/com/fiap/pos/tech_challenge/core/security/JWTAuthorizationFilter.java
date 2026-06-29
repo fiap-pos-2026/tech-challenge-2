@@ -1,7 +1,9 @@
 package br.com.fiap.pos.tech_challenge.core.security;
 
+import br.com.fiap.pos.tech_challenge.core.enums.AuditEventType;
 import br.com.fiap.pos.tech_challenge.core.enums.EApplicationError;
 import br.com.fiap.pos.tech_challenge.core.exception.CoreException;
+import br.com.fiap.pos.tech_challenge.core.service.AuditLogService;
 import br.com.fiap.pos.tech_challenge.core.util.Translator;
 import br.com.fiap.pos.tech_challenge.core.util.WebUtility;
 import jakarta.servlet.FilterChain;
@@ -33,6 +35,10 @@ public class JWTAuthorizationFilter extends BasicAuthenticationFilter {
 
     private TokenUtility tokenUtility;
 
+    private TokenBlacklistService tokenBlacklistService;
+
+    private AuditLogService auditLogService;
+
     private static final String BEARER_TOKEN = "Bearer";
 
     public JWTAuthorizationFilter(AuthenticationManager authenticationManager, UserDetailsService service,
@@ -60,6 +66,13 @@ public class JWTAuthorizationFilter extends BasicAuthenticationFilter {
             tokenUtility.validate(token, (UserDetailsImpl) details);
 
             UserDetailsImpl impl = (UserDetailsImpl) details;
+
+            if (isBlacklistedToken(token, impl)) {
+                EApplicationError error = EApplicationError.TOKEN_BLACKLISTED;
+                WebUtility.writeError(response, error, translator.translateFromRequest(error.getMessageKey(), request));
+                return;
+            }
+
             if (!impl.isActive()) {
                 EApplicationError error = EApplicationError.ACCOUNT_INACTIVE;
                 WebUtility.writeError(response, error, translator.translateFromRequest(error.getMessageKey(), request));
@@ -91,6 +104,29 @@ public class JWTAuthorizationFilter extends BasicAuthenticationFilter {
         chain.doFilter(request, response);
     }
 
+    private boolean isBlacklistedToken(String token, UserDetailsImpl impl) {
+        try {
+            String jti = tokenUtility.getJti(token);
+            if (tokenBlacklistService == null || !tokenBlacklistService.isBlacklisted(jti)) {
+                return false;
+            }
+            tryRegisterBlacklistAudit(impl, jti);
+            return true;
+        } catch (Exception e) {
+            log.warn("Falha ao verificar blacklist (fail-open): {}", e.getMessage());
+            return false;
+        }
+    }
+
+    private void tryRegisterBlacklistAudit(UserDetailsImpl impl, String jti) {
+        try {
+            auditLogService.register(AuditEventType.BLACKLISTED_TOKEN_REJECTED,
+                    impl, jti, "BLOCKED", "Token on blacklist");
+        } catch (Exception e) {
+            log.warn("Falha ao registrar auditoria de token na blacklist: {}", e.getMessage());
+        }
+    }
+
     private String getToken(HttpServletRequest request) {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
 
@@ -110,5 +146,15 @@ public class JWTAuthorizationFilter extends BasicAuthenticationFilter {
     @Autowired
     public void setTokenUtility(TokenUtility tokenUtility) {
         this.tokenUtility = tokenUtility;
+    }
+
+    @Autowired
+    public void setTokenBlacklistService(TokenBlacklistService tokenBlacklistService) {
+        this.tokenBlacklistService = tokenBlacklistService;
+    }
+
+    @Autowired
+    public void setAuditLogService(AuditLogService auditLogService) {
+        this.auditLogService = auditLogService;
     }
 }

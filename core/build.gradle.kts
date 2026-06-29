@@ -9,12 +9,19 @@ plugins {
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.boot:spring-boot-starter-mail")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:${property("springDocVersion")}")
     testImplementation("org.springframework.security:spring-security-test")
     testImplementation(platform("org.testcontainers:testcontainers-bom:2.0.5"))
     testImplementation("org.testcontainers:testcontainers-postgresql")
     testImplementation("org.testcontainers:testcontainers-junit-jupiter")
+}
+
+dependencyManagement {
+    dependencies {
+        dependency("com.fasterxml.jackson.core:jackson-databind:2.22.0")
+    }
 }
 
 dependencyCheck {
@@ -28,8 +35,6 @@ jacoco {
 }
 
 tasks.test {
-    // Testes de integração podem falhar quando Docker não está disponível no ambiente.
-    // ignoreFailures garante que o JaCoCo gere relatório e verifique a cobertura mesmo assim.
     ignoreFailures = true
 }
 

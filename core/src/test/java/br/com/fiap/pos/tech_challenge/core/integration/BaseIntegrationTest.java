@@ -14,9 +14,6 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 @ActiveProfiles("test")
 public abstract class BaseIntegrationTest {
 
-    // Singleton: iniciado uma vez por JVM, sem parar entre classes.
-    // @Container com campo static em superclasse faz o Testcontainers parar e reiniciar
-    // o container a cada classe concreta, quebrando o contexto Spring cacheado.
     static final PostgreSQLContainer POSTGRES =
             new PostgreSQLContainer("postgres:16-alpine")
                     .withDatabaseName("tech_challenge_test")
