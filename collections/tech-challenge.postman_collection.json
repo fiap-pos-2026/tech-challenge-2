@@ -194,8 +194,8 @@
                 "exec": [
                   "if (pm.response.code === 201) {",
                   "  const body = pm.response.json();",
-                  "  pm.collectionVariables.set('userId', body.id);",
-                  "  console.log('Attendant userId:', body.id);",
+                  "  pm.collectionVariables.set('userId', body.uuid);",
+                  "  console.log('Attendant userId:', body.uuid);",
                   "}"
                 ]
               }
@@ -287,8 +287,8 @@
                 "exec": [
                   "if (pm.response.code === 201) {",
                   "  const body = pm.response.json();",
-                  "  pm.collectionVariables.set('mechanicUserId', body.id);",
-                  "  console.log('Mechanic userId:', body.id);",
+                  "  pm.collectionVariables.set('mechanicUserId', body.uuid);",
+                  "  console.log('Mechanic userId:', body.uuid);",
                   "}"
                 ]
               }
@@ -585,6 +585,22 @@
       "description": "Operações do perfil do usuário autenticado. Único grupo acessível quando forceChangePassword = true.",
       "item": [
         {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "profile"
+              ]
+            }
+          }
+        },
+        {
           "name": "Change Password",
           "request": {
             "method": "PUT",
@@ -615,7 +631,7 @@
     },
     {
       "name": "Internal Users",
-      "description": "Gestão de usuários internos do sistema (Atendentes e Mecânicos). Requer JWT autenticado.",
+      "description": "Gestão de usuários internos do sistema (Atendentes e Mecânicos). Requer role ADMIN.",
       "item": [
         {
           "name": "List Users",
@@ -682,7 +698,7 @@
                 "exec": [
                   "if (pm.response.code === 201) {",
                   "  const body = pm.response.json();",
-                  "  pm.collectionVariables.set('userId', body.id);",
+                  "  pm.collectionVariables.set('userId', body.uuid);",
                   "}"
                 ]
               }
@@ -1283,6 +1299,36 @@
                     "{{serviceOrderUuid}}",
                     "diagnosis",
                     "products"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Remove Product from Diagnosis",
+              "request": {
+                "method": "DELETE",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessTokenMechanic}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/service-orders/{{serviceOrderUuid}}/diagnosis/products/{{productUuid}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "service-orders",
+                    "{{serviceOrderUuid}}",
+                    "diagnosis",
+                    "products",
+                    "{{productUuid}}"
                   ]
                 }
               }
