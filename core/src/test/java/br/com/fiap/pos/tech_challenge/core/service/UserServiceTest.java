@@ -22,6 +22,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -268,6 +269,110 @@ class UserServiceTest {
         assertThatThrownBy(() ->
                 sut.changePassword(1L, new br.com.fiap.pos.tech_challenge.core.controller.dto.ChangePasswordDTO("senhaAtual", "senhaAtual")))
                 .isInstanceOf(CoreException.class);
+    }
+
+    // ---- deleteByUuid — last admin guard ----
+
+    @Test
+    void deleteByUuid_throwsWhenDeletingLastAdmin() {
+        UUID uuid = UUID.randomUUID();
+        User target = user("admin2");
+        target.setId(2L);
+        target.setRole(UserRole.ADMIN);
+        when(repository.findByUuid(uuid)).thenReturn(Optional.of(target));
+        when(repository.countByRole(UserRole.ADMIN)).thenReturn(1L);
+
+        assertThatThrownBy(() -> sut.deleteByUuid(uuid))
+                .isInstanceOf(CoreException.class);
+        verify(repository, never()).deleteById(any());
+    }
+
+    // ---- changePassword — lockout edge cases ----
+
+    @Test
+    void changePassword_throwsWhenAccountIsLocked() {
+        User u = user("joao");
+        u.setId(1L);
+        u.setLockedUntil(LocalDateTime.now().plusMinutes(10));
+        when(repository.findById(1L)).thenReturn(Optional.of(u));
+
+        assertThatThrownBy(() ->
+                sut.changePassword(1L, new br.com.fiap.pos.tech_challenge.core.controller.dto.ChangePasswordDTO("senhaAtual", "novaSenha@1")))
+                .isInstanceOf(CoreException.class);
+        verify(passwordEncoder, never()).matches(any(), any());
+    }
+
+    @Test
+    void changePassword_locksAccountAfterMaxAttempts() {
+        User u = user("joao");
+        u.setId(1L);
+        u.setLoginFailedAttempts(4);
+        when(repository.findById(1L)).thenReturn(Optional.of(u));
+        when(passwordEncoder.matches("errada", "hash")).thenReturn(false);
+
+        assertThatThrownBy(() ->
+                sut.changePassword(1L, new br.com.fiap.pos.tech_challenge.core.controller.dto.ChangePasswordDTO("errada", "nova@1")))
+                .isInstanceOf(CoreException.class);
+
+        assertThat(u.getLockedUntil()).isNotNull();
+        assertThat(u.getLoginFailedAttempts()).isEqualTo(5);
+        verify(repository).save(u);
+    }
+
+    // ---- getLoggedUser ----
+
+    @Test
+    void getLoggedUser_returnsCurrentUserDTO() {
+        User entity = user("admin");
+        entity.setId(999L);
+        when(repository.findById(999L)).thenReturn(Optional.of(entity));
+        when(mapper.toDTO(entity)).thenReturn(userDTO());
+
+        assertThat(sut.getLoggedUser()).isNotNull();
+    }
+
+    @Test
+    void getLoggedUser_throwsWhenUserNotFoundInRepository() {
+        when(repository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> sut.getLoggedUser())
+                .isInstanceOf(CoreException.class);
+    }
+
+    // ---- update — role change audit + self-role guard ----
+
+    @Test
+    void update_logsAuditWhenRoleChanges() {
+        UUID uuid = UUID.randomUUID();
+        User current = user("mecanico");
+        current.setId(1L);
+        current.setRole(UserRole.MECHANIC);
+        current.setEmail("mecanico@mail.com");
+        UpdateUserDTO dto = new UpdateUserDTO("M", "S", "mecanico@mail.com", LocalDate.of(1990, 1, 1), "mecanico", "senha123", "11999999999", UserRole.ATTENDANT);
+
+        when(repository.findByUuid(uuid)).thenReturn(Optional.of(current));
+        when(mapper.fullUpdate(dto, current)).thenReturn(current);
+        when(repository.save(current)).thenReturn(current);
+        when(mapper.toDTO(current)).thenReturn(userDTO());
+
+        sut.update(uuid, dto);
+
+        verify(auditLogService).register(any(), any(), eq("mecanico"), eq("SUCCESS"), any());
+    }
+
+    @Test
+    void update_throwsWhenAdminTriesToChangeOwnRole() {
+        UUID uuid = UUID.randomUUID();
+        User current = user("admin");
+        current.setId(999L);
+        current.setRole(UserRole.ADMIN);
+        UpdateUserDTO dto = new UpdateUserDTO("A", "S", "admin@mail.com", LocalDate.of(1990, 1, 1), "admin", "senha", "11999999999", UserRole.MECHANIC);
+
+        when(repository.findByUuid(uuid)).thenReturn(Optional.of(current));
+
+        assertThatThrownBy(() -> sut.update(uuid, dto))
+                .isInstanceOf(CoreException.class);
+        verify(repository, never()).save(any());
     }
 
     // ---- findByLogin ----

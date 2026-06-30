@@ -13,6 +13,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mail.MailException;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -196,6 +200,91 @@ class OTPServiceTest {
         sut.invalidateByServiceOrder(so);
 
         verify(otpTokenRepository, never()).save(any());
+    }
+
+    // ---- sendEmail via generateAndSend ----
+
+    @Test
+    void generateAndSend_sendsEmailWithApprovalSubjectForNonCompletedStatus() {
+        JavaMailSender mailSender = mock(JavaMailSender.class);
+        ReflectionTestUtils.setField(sut, "mailSender", mailSender);
+
+        ServiceOrder so = serviceOrder(ServiceOrderStatus.AWAITING_APPROVAL);
+        Customer customer = new Customer();
+        customer.setEmail("cliente@mail.com");
+        so.setCustomer(customer);
+
+        when(otpTokenRepository.findFirstByServiceOrderIdAndUsedFalseAndInvalidatedAtIsNullAndExpiresAtAfter(
+                any(), any())).thenReturn(Optional.empty());
+
+        sut.generateAndSend(so);
+
+        verify(mailSender).send(argThat((SimpleMailMessage msg) ->
+                msg.getSubject() != null && msg.getSubject().contains("aprovação")));
+    }
+
+    @Test
+    void generateAndSend_sendsEmailWithDeliverySubjectForCompletedStatus() {
+        JavaMailSender mailSender = mock(JavaMailSender.class);
+        ReflectionTestUtils.setField(sut, "mailSender", mailSender);
+
+        ServiceOrder so = serviceOrder(ServiceOrderStatus.COMPLETED);
+        Customer customer = new Customer();
+        customer.setEmail("cliente@mail.com");
+        so.setCustomer(customer);
+
+        when(otpTokenRepository.findFirstByServiceOrderIdAndUsedFalseAndInvalidatedAtIsNullAndExpiresAtAfter(
+                any(), any())).thenReturn(Optional.empty());
+
+        sut.generateAndSend(so);
+
+        verify(mailSender).send(argThat((SimpleMailMessage msg) ->
+                msg.getSubject() != null && msg.getSubject().contains("entrega")));
+    }
+
+    @Test
+    void generateAndSend_notifiesAttendantWhenMailSenderThrows() {
+        JavaMailSender mailSender = mock(JavaMailSender.class);
+        ReflectionTestUtils.setField(sut, "mailSender", mailSender);
+
+        ServiceOrder so = serviceOrder(ServiceOrderStatus.AWAITING_APPROVAL);
+        Customer customer = new Customer();
+        customer.setEmail("cliente@mail.com");
+        so.setCustomer(customer);
+
+        when(otpTokenRepository.findFirstByServiceOrderIdAndUsedFalseAndInvalidatedAtIsNullAndExpiresAtAfter(
+                any(), any())).thenReturn(Optional.empty());
+        doThrow(mock(MailException.class)).when(mailSender).send(any(SimpleMailMessage.class));
+
+        sut.generateAndSend(so);
+
+        verify(notificationService).publishToRole(any(), any(), any(), eq(so));
+    }
+
+    // ---- validate — document mismatch ----
+
+    @Test
+    void validate_throwsWhenDocumentDoesNotMatch() throws Exception {
+        UUID osUuid = UUID.randomUUID();
+        ServiceOrder so = serviceOrder(ServiceOrderStatus.AWAITING_APPROVAL);
+        so.setUuid(osUuid);
+        Customer customer = new Customer();
+        customer.setDocument("52998224725");
+        so.setCustomer(customer);
+
+        String rawToken = "correcttoken";
+        OTPToken token = new OTPToken();
+        token.setTokenHash(sha256(rawToken));
+        token.setInvalidAttempts(0);
+
+        when(serviceOrderRepository.findByUuid(osUuid)).thenReturn(Optional.of(so));
+        when(otpTokenRepository.findFirstByServiceOrderIdAndUsedFalseAndInvalidatedAtIsNullAndExpiresAtAfter(
+                any(), any())).thenReturn(Optional.of(token));
+
+        assertThatThrownBy(() -> sut.validate(osUuid, "11111111111", rawToken))
+                .isInstanceOf(InvalidOTPTokenException.class);
+
+        assertThat(token.getInvalidAttempts()).isEqualTo(1);
     }
 
     // ---- helpers ----

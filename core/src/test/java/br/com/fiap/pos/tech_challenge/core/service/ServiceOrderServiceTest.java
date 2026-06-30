@@ -3,10 +3,7 @@ package br.com.fiap.pos.tech_challenge.core.service;
 import br.com.fiap.pos.tech_challenge.core.controller.dto.ServiceOrderResponse;
 import br.com.fiap.pos.tech_challenge.core.domain.*;
 import br.com.fiap.pos.tech_challenge.core.enums.ServiceOrderStatus;
-import br.com.fiap.pos.tech_challenge.core.exception.CoreException;
-import br.com.fiap.pos.tech_challenge.core.exception.InvalidStatusTransitionException;
-import br.com.fiap.pos.tech_challenge.core.exception.ReturnNotAllowedException;
-import br.com.fiap.pos.tech_challenge.core.exception.ServiceOrderNotFoundException;
+import br.com.fiap.pos.tech_challenge.core.exception.*;
 import br.com.fiap.pos.tech_challenge.core.mapper.ServiceOrderMapper;
 import br.com.fiap.pos.tech_challenge.core.repository.*;
 import br.com.fiap.pos.tech_challenge.core.security.UserDetailsImpl;
@@ -16,9 +13,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -29,10 +26,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
@@ -824,6 +818,271 @@ class ServiceOrderServiceTest {
         when(mapper.toResponse(so)).thenReturn(expected);
 
         assertThat(sut.getServiceOrder(uuid)).isEqualTo(expected);
+    }
+
+    // -----------------------------------------------------------------------
+    // removeServiceFromDiagnosis
+    // -----------------------------------------------------------------------
+    @Test
+    void removeServiceFromDiagnosis_removesLineAndRecalculates() {
+        UUID osUuid = UUID.randomUUID();
+        UUID msUuid = UUID.randomUUID();
+
+        MechanicalService ms = new MechanicalService();
+        ms.setUuid(msUuid);
+        ms.setBasePrice(new BigDecimal("100.00"));
+        ms.setEstimatedDurationMinutes(30);
+
+        QuoteServiceLine line = new QuoteServiceLine();
+        line.setMechanicalService(ms);
+        line.setPriceSnapshot(new BigDecimal("100.00"));
+
+        Quote quote = new Quote();
+        quote.getServiceLines().add(line);
+
+        ServiceOrder so = serviceOrderWithStatus(ServiceOrderStatus.IN_DIAGNOSIS);
+
+        when(serviceOrderRepository.findByUuid(osUuid)).thenReturn(Optional.of(so));
+        when(quoteRepository.findFirstByServiceOrderIdOrderByCreatedAtDesc(any())).thenReturn(Optional.of(quote));
+        when(quoteRepository.save(any())).thenReturn(quote);
+        when(mapper.toResponse(so)).thenReturn(responseFor(so));
+
+        sut.removeServiceFromDiagnosis(osUuid, msUuid);
+
+        assertThat(quote.getServiceLines()).isEmpty();
+        assertThat(quote.getTotalAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+        verify(quoteRepository).save(quote);
+    }
+
+    @Test
+    void removeServiceFromDiagnosis_throwsWhenServiceNotInQuote() {
+        UUID osUuid = UUID.randomUUID();
+        UUID msUuid = UUID.randomUUID();
+
+        Quote quote = new Quote();
+        ServiceOrder so = serviceOrderWithStatus(ServiceOrderStatus.IN_DIAGNOSIS);
+
+        when(serviceOrderRepository.findByUuid(osUuid)).thenReturn(Optional.of(so));
+        when(quoteRepository.findFirstByServiceOrderIdOrderByCreatedAtDesc(any())).thenReturn(Optional.of(quote));
+
+        assertThatThrownBy(() -> sut.removeServiceFromDiagnosis(osUuid, msUuid))
+                .isInstanceOf(MechanicalServiceNotFoundException.class);
+    }
+
+    // -----------------------------------------------------------------------
+    // completeDiagnosis
+    // -----------------------------------------------------------------------
+    @Test
+    void completeDiagnosis_transitionsToAwaitingApprovalAndSendsOTP() {
+        UUID uuid = UUID.randomUUID();
+        ServiceOrder so = serviceOrderWithStatus(ServiceOrderStatus.IN_DIAGNOSIS);
+        Quote quote = new Quote();
+        ServiceOrderResponse expected = responseFor(so);
+
+        when(serviceOrderRepository.findByUuid(uuid)).thenReturn(Optional.of(so));
+        when(quoteRepository.findFirstByServiceOrderIdOrderByCreatedAtDesc(any())).thenReturn(Optional.of(quote));
+        when(quoteRepository.save(quote)).thenReturn(quote);
+        when(serviceOrderRepository.save(so)).thenReturn(so);
+        when(mapper.toResponse(so)).thenReturn(expected);
+
+        ServiceOrderResponse result = sut.completeDiagnosis(uuid);
+
+        assertThat(so.getStatus()).isEqualTo(ServiceOrderStatus.AWAITING_APPROVAL);
+        assertThat(so.getApprovalExpiresAt()).isNotNull();
+        verify(otpService).generateAndSend(so);
+        assertThat(result).isNotNull();
+    }
+
+    @Test
+    void completeDiagnosis_throwsWhenNotInDiagnosis() {
+        UUID uuid = UUID.randomUUID();
+        ServiceOrder so = serviceOrderWithStatus(ServiceOrderStatus.RECEIVED);
+        when(serviceOrderRepository.findByUuid(uuid)).thenReturn(Optional.of(so));
+
+        assertThatThrownBy(() -> sut.completeDiagnosis(uuid))
+                .isInstanceOf(InvalidStatusTransitionException.class);
+    }
+
+    // -----------------------------------------------------------------------
+    // requestProduct
+    // -----------------------------------------------------------------------
+    @Test
+    void requestProduct_debitsAndTriggersApprovalWhenInProgress() {
+        UUID osUuid = UUID.randomUUID();
+        UUID productUuid = UUID.randomUUID();
+
+        Product product = new Product();
+        product.setUuid(productUuid);
+        product.setName("Filtro de ar");
+        product.setUnitPrice(new BigDecimal("30.00"));
+
+        Quote quote = new Quote();
+
+        ServiceOrder so = serviceOrderWithStatus(ServiceOrderStatus.IN_PROGRESS);
+
+        UserDetailsImpl principal = mock(UserDetailsImpl.class);
+        when(principal.getId()).thenReturn(1L);
+
+        when(serviceOrderRepository.findByUuid(osUuid)).thenReturn(Optional.of(so));
+        when(productRepository.findByUuid(productUuid)).thenReturn(Optional.of(product));
+        when(quoteRepository.findFirstByServiceOrderIdOrderByCreatedAtDesc(any())).thenReturn(Optional.of(quote));
+        when(quoteRepository.save(any())).thenReturn(quote);
+        when(serviceOrderRepository.save(so)).thenReturn(so);
+        when(userRepository.findById(1L)).thenReturn(Optional.empty());
+        when(mapper.toResponse(so)).thenReturn(responseFor(so));
+
+        sut.requestProduct(osUuid, productUuid, BigDecimal.ONE, principal);
+
+        verify(stockService).debit(eq(productUuid), eq(BigDecimal.ONE), eq(so), isNull());
+        assertThat(so.getStatus()).isEqualTo(ServiceOrderStatus.AWAITING_APPROVAL);
+        assertThat(so.getApprovalExpiresAt()).isNotNull();
+        verify(otpService).generateAndSend(so);
+    }
+
+    @Test
+    void requestProduct_addendumPhase_debitsAndDoesNotChangeStatus() {
+        UUID osUuid = UUID.randomUUID();
+        UUID productUuid = UUID.randomUUID();
+
+        Product product = new Product();
+        product.setUuid(productUuid);
+        product.setName("Pastilha de freio");
+        product.setUnitPrice(new BigDecimal("80.00"));
+
+        Quote quote = new Quote();
+        quote.setApprovedAt(Instant.now().minusSeconds(3600));
+
+        ServiceOrder so = serviceOrderWithStatus(ServiceOrderStatus.AWAITING_APPROVAL);
+
+        UserDetailsImpl principal = mock(UserDetailsImpl.class);
+        when(principal.getId()).thenReturn(2L);
+
+        when(serviceOrderRepository.findByUuid(osUuid)).thenReturn(Optional.of(so));
+        when(quoteRepository.findFirstByServiceOrderIdOrderByCreatedAtDesc(any())).thenReturn(Optional.of(quote));
+        when(productRepository.findByUuid(productUuid)).thenReturn(Optional.of(product));
+        when(quoteRepository.save(any())).thenReturn(quote);
+        when(userRepository.findById(2L)).thenReturn(Optional.empty());
+        when(mapper.toResponse(so)).thenReturn(responseFor(so));
+
+        sut.requestProduct(osUuid, productUuid, BigDecimal.ONE, principal);
+
+        verify(stockService).debit(eq(productUuid), eq(BigDecimal.ONE), eq(so), isNull());
+        assertThat(so.getStatus()).isEqualTo(ServiceOrderStatus.AWAITING_APPROVAL);
+        verify(otpService, never()).generateAndSend(any());
+        verify(serviceOrderRepository, never()).save(any());
+    }
+
+    @Test
+    void requestProduct_throwsWhenProductNotFound() {
+        UUID osUuid = UUID.randomUUID();
+        UUID productUuid = UUID.randomUUID();
+
+        ServiceOrder so = serviceOrderWithStatus(ServiceOrderStatus.IN_PROGRESS);
+
+        when(serviceOrderRepository.findByUuid(osUuid)).thenReturn(Optional.of(so));
+        when(productRepository.findByUuid(productUuid)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> sut.requestProduct(osUuid, productUuid, BigDecimal.ONE, null))
+                .isInstanceOf(ProductNotFoundException.class);
+    }
+
+    @Test
+    void requestProduct_notifiesAndThrowsWhenInsufficientStock() {
+        UUID osUuid = UUID.randomUUID();
+        UUID productUuid = UUID.randomUUID();
+
+        Product product = new Product();
+        product.setUuid(productUuid);
+
+        ServiceOrder so = serviceOrderWithStatus(ServiceOrderStatus.IN_PROGRESS);
+
+        UserDetailsImpl principal = mock(UserDetailsImpl.class);
+        when(principal.getId()).thenReturn(1L);
+        when(userRepository.findById(1L)).thenReturn(Optional.empty());
+
+        when(serviceOrderRepository.findByUuid(osUuid)).thenReturn(Optional.of(so));
+        when(productRepository.findByUuid(productUuid)).thenReturn(Optional.of(product));
+        doThrow(new InsufficientStockException()).when(stockService).debit(any(), any(), any(), any());
+
+        assertThatThrownBy(() -> sut.requestProduct(osUuid, productUuid, BigDecimal.ONE, principal))
+                .isInstanceOf(InsufficientStockException.class);
+
+        verify(notificationService).publishInsufficientStockNotification(any(), eq(so));
+    }
+
+    // -----------------------------------------------------------------------
+    // closeDispute — from IN_PROGRESS
+    // -----------------------------------------------------------------------
+    @Test
+    void closeDispute_succeedsFromInProgressStatus() {
+        UUID uuid = UUID.randomUUID();
+        ServiceOrder so = serviceOrderWithStatus(ServiceOrderStatus.IN_PROGRESS);
+
+        when(serviceOrderRepository.findByUuid(uuid)).thenReturn(Optional.of(so));
+        when(serviceOrderRepository.save(so)).thenReturn(so);
+        when(mapper.toResponse(so)).thenReturn(responseFor(so));
+        when(quoteRepository.findFirstByServiceOrderIdOrderByCreatedAtDesc(any())).thenReturn(Optional.empty());
+
+        ServiceOrderResponse result = sut.closeDispute(uuid, "motivo", null);
+
+        assertThat(so.getStatus()).isEqualTo(ServiceOrderStatus.DISPUTED);
+        assertThat(result).isNotNull();
+    }
+
+    // -----------------------------------------------------------------------
+    // approveQuote — debit throws InsufficientStockException (fail-open)
+    // -----------------------------------------------------------------------
+    @Test
+    void approveQuote_notifiesAndContinuesWhenDebitThrowsInsufficientStock() {
+        UUID uuid = UUID.randomUUID();
+        UUID productUuid = UUID.randomUUID();
+
+        Product product = new Product();
+        product.setUuid(productUuid);
+
+        QuoteProductLine line = new QuoteProductLine();
+        line.setProduct(product);
+        line.setQuantity(BigDecimal.ONE);
+        line.setUnbudgeted(false);
+
+        Quote quote = new Quote();
+        quote.getProductLines().add(line);
+
+        ServiceOrder so = serviceOrderWithStatus(ServiceOrderStatus.AWAITING_APPROVAL);
+
+        when(serviceOrderRepository.findByUuid(uuid)).thenReturn(Optional.of(so));
+        when(quoteRepository.findFirstByServiceOrderIdOrderByCreatedAtDesc(any())).thenReturn(Optional.of(quote));
+        when(quoteRepository.save(any())).thenReturn(quote);
+        when(serviceOrderRepository.save(any())).thenReturn(so);
+        when(mapper.toResponse(any())).thenReturn(responseFor(so));
+        doThrow(new InsufficientStockException()).when(stockService).debit(any(), any(), any(), isNull());
+
+        ServiceOrderResponse result = sut.approveQuote(uuid, "52998224725", "token");
+
+        verify(notificationService).publishInsufficientStockNotification(any(), eq(so));
+        assertThat(result).isNotNull();
+    }
+
+    // -----------------------------------------------------------------------
+    // returnProduct — product not in quote
+    // -----------------------------------------------------------------------
+    @Test
+    void returnProduct_throwsWhenProductNotInQuote() {
+        UUID osUuid = UUID.randomUUID();
+        UUID productUuid = UUID.randomUUID();
+
+        Quote quote = new Quote(); // empty product lines
+
+        ServiceOrder so = serviceOrderWithStatus(ServiceOrderStatus.IN_PROGRESS);
+
+        UserDetailsImpl principal = mock(UserDetailsImpl.class);
+        when(principal.getLogin()).thenReturn("mecanico");
+
+        when(serviceOrderRepository.findByUuid(osUuid)).thenReturn(Optional.of(so));
+        when(quoteRepository.findFirstByServiceOrderIdOrderByCreatedAtDesc(any())).thenReturn(Optional.of(quote));
+
+        assertThatThrownBy(() -> sut.returnProduct(osUuid, productUuid, "pass", principal))
+                .isInstanceOf(ProductNotFoundException.class);
     }
 
     // -----------------------------------------------------------------------
