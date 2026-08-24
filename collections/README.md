@@ -71,8 +71,8 @@ Fluxo completo em 5 subfastas:
 #### Opening
 | Requisição                       | Notas                                              |
 |----------------------------------|----------------------------------------------------|
-| Open Service Order               | Salva `serviceOrderUuid`                           |
-| List Service Orders              | Filtros opcionais: `status`, `customerUuid`, `from`, `to` |
+| Open Service Order               | Salva `serviceOrderUuid`. `mechanicalServiceUuids` e `products` (`productUuid` + `quantity`) são **opcionais** — omitir ou enviar vazio cria a OS normalmente em `RECEIVED`; quando preenchidos, os itens entram direto no orçamento provisório da OS. UUID de serviço/produto inexistente → `404` e a OS **não** é criada |
+| List Service Orders              | Filtros opcionais: `status`, `customerUuid`, `from`, `to`. **Sem `status` explícito**: exclui `COMPLETED`/`DELIVERED` e ordena por prioridade — `IN_PROGRESS` > `AWAITING_APPROVAL` > `IN_DIAGNOSIS` > `RECEIVED` > demais status, depois `createdAt` ascendente. **Com `status` explícito** (incluindo `COMPLETED`/`DELIVERED`): retorna só aquele status, sobrescrevendo a exclusão padrão. `sort` do client é ignorado para preservar a prioridade de negócio |
 | Get Service Order                | Retorna OS completa com Quote e linhas             |
 | Get Service Order Status (Public)| Sem autenticação — para o cliente consultar online |
 
