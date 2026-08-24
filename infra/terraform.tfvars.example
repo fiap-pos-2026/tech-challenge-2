@@ -1,0 +1,10 @@
+# Copie para terraform.tfvars (ignorado pelo git) e ajuste os valores reais.
+# NUNCA commite terraform.tfvars com senhas reais.
+
+kubeconfig_path = "~/.kube/config"
+kube_context    = ""
+
+namespace   = "tech-challenge"
+db_name     = "techbase"
+db_username = "techdev"
+db_password = "CHANGE_ME"

@@ -1,0 +1,12 @@
+# Estado e cache do Terraform nunca entram no repositório
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# Valores reais de variáveis (ex.: db_password) — só terraform.tfvars.example é versionado
+*.tfvars
+*.tfvars.json
+!terraform.tfvars.example
