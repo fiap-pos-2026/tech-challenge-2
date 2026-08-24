@@ -441,6 +441,10 @@ Setup (pasta completa)
 
 Os testes de integração sobem um PostgreSQL real via Testcontainers — o Docker precisa estar rodando.
 
+Qualquer teste falhando derruba `:core:test` e, na pipeline, bloqueia imagem e deploy. Para inspecionar
+o relatório completo localmente sem interromper o build na primeira falha, exporte
+`IGNORE_TEST_FAILURES=true` — a pipeline fixa essa variável em `false` e ignora o override.
+
 ---
 
 ## Segurança

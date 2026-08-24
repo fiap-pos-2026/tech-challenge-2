@@ -36,7 +36,11 @@ jobs:
       - name: Build
         run: ./gradlew :core:assemble --console=plain
 
+      # `IGNORE_TEST_FAILURES` é fixado em false para que o override local nunca vaze do
+      # ambiente do runner: qualquer teste falhando derruba este job e, por `needs`, os seguintes.
       - name: Test
+        env:
+          IGNORE_TEST_FAILURES: "false"
         run: ./gradlew :core:test --console=plain
 
       - name: Upload test reports
