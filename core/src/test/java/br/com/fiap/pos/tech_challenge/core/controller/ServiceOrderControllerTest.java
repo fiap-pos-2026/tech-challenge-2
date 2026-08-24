@@ -62,7 +62,7 @@ class ServiceOrderControllerTest {
         @Test
         void open_returns201OnSuccess() throws Exception {
             OpenServiceOrderRequest request = new OpenServiceOrderRequest(
-                    UUID.randomUUID(), UUID.randomUUID(), "Barulho no motor");
+                    UUID.randomUUID(), UUID.randomUUID(), "Barulho no motor", null, null);
             when(service.openServiceOrder(any(), any(), any())).thenReturn(stubResponse());
 
             mockMvc.perform(post("/api/service-orders")
