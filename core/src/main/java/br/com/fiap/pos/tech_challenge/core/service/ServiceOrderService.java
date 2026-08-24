@@ -18,8 +18,10 @@ import br.com.fiap.pos.tech_challenge.core.exception.ServiceOrderNotFoundExcepti
 import br.com.fiap.pos.tech_challenge.core.mapper.ServiceOrderMapper;
 import br.com.fiap.pos.tech_challenge.core.repository.*;
 import br.com.fiap.pos.tech_challenge.core.security.UserDetailsImpl;
+import br.com.fiap.pos.tech_challenge.core.service.event.ServiceOrderStatusChangedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -60,6 +62,7 @@ public class ServiceOrderService {
     private final AuthenticationService authenticationService;
     private final UserRepository userRepository;
     private final ServiceOrderMapper mapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public ServiceOrderResponse openServiceOrder(UUID customerUuid, UUID vehicleUuid,
@@ -72,20 +75,18 @@ public class ServiceOrderService {
         }
 
         ServiceOrder so = new ServiceOrder();
-        so.setStatus(ServiceOrderStatus.RECEIVED);
         so.setCustomerComplaint(customerComplaint);
         so.setCustomer(customer);
         so.setVehicle(vehicle);
 
-        return buildResponse(serviceOrderRepository.save(so));
+        return buildResponse(persistStatusChange(so, ServiceOrderStatus.RECEIVED));
     }
 
     @Transactional
     public ServiceOrderResponse startDiagnosis(UUID osUuid) {
         ServiceOrder so = findServiceOrder(osUuid);
         requireStatus(so, ServiceOrderStatus.RECEIVED);
-        so.setStatus(ServiceOrderStatus.IN_DIAGNOSIS);
-        return buildResponse(serviceOrderRepository.save(so));
+        return buildResponse(persistStatusChange(so, ServiceOrderStatus.IN_DIAGNOSIS));
     }
 
     // -----------------------------------------------------------------------
@@ -197,9 +198,8 @@ public class ServiceOrderService {
         quote.setTotalAmount(calculateTotal(quote));
         quoteRepository.save(quote);
 
-        so.setStatus(ServiceOrderStatus.AWAITING_APPROVAL);
         so.setApprovalExpiresAt(Instant.now().plus(APPROVAL_WINDOW_HOURS, ChronoUnit.HOURS));
-        ServiceOrder saved = serviceOrderRepository.save(so);
+        ServiceOrder saved = persistStatusChange(so, ServiceOrderStatus.AWAITING_APPROVAL);
 
         otpService.generateAndSend(saved);
         return buildResponse(saved);
@@ -227,8 +227,7 @@ public class ServiceOrderService {
         quote.setApprovedAt(Instant.now());
         quoteRepository.save(quote);
 
-        so.setStatus(ServiceOrderStatus.IN_PROGRESS);
-        ServiceOrder saved = serviceOrderRepository.save(so);
+        ServiceOrder saved = persistStatusChange(so, ServiceOrderStatus.IN_PROGRESS);
 
         if (firstApproval) {
             for (QuoteProductLine line : quote.getProductLines()) {
@@ -264,8 +263,7 @@ public class ServiceOrderService {
                 .filter(QuoteProductLine::isUnbudgeted).toList();
 
         if (unbudgeted.isEmpty()) {
-            so.setStatus(ServiceOrderStatus.CANCELLED);
-            ServiceOrder saved = serviceOrderRepository.save(so);
+            ServiceOrder saved = persistStatusChange(so, ServiceOrderStatus.CANCELLED);
             notificationService.publishToRole(UserRole.ATTENDANT, NotificationType.QUOTE_REJECTED,
                     "Orçamento da OS " + osUuid + " rejeitado pelo cliente.", saved);
             return buildResponse(saved);
@@ -279,8 +277,7 @@ public class ServiceOrderService {
         quote.setTotalAmount(calculateTotal(quote));
         quoteRepository.save(quote);
 
-        so.setStatus(ServiceOrderStatus.IN_PROGRESS);
-        ServiceOrder saved = serviceOrderRepository.save(so);
+        ServiceOrder saved = persistStatusChange(so, ServiceOrderStatus.IN_PROGRESS);
 
         notificationService.publishToRole(UserRole.MECHANIC, NotificationType.ADDENDUM_PRODUCT_REJECTED,
                 "Adendo da OS " + osUuid + " rejeitado pelo cliente.", saved);
@@ -342,9 +339,8 @@ public class ServiceOrderService {
         quoteRepository.save(quote);
 
         if (so.getStatus() == ServiceOrderStatus.IN_PROGRESS) {
-            so.setStatus(ServiceOrderStatus.AWAITING_APPROVAL);
             so.setApprovalExpiresAt(Instant.now().plus(APPROVAL_WINDOW_HOURS, ChronoUnit.HOURS));
-            so = serviceOrderRepository.save(so);
+            so = persistStatusChange(so, ServiceOrderStatus.AWAITING_APPROVAL);
             otpService.generateAndSend(so);
         }
 
@@ -386,8 +382,7 @@ public class ServiceOrderService {
     public ServiceOrderResponse completeExecution(UUID osUuid) {
         ServiceOrder so = findServiceOrder(osUuid);
         requireStatus(so, ServiceOrderStatus.IN_PROGRESS);
-        so.setStatus(ServiceOrderStatus.COMPLETED);
-        ServiceOrder saved = serviceOrderRepository.save(so);
+        ServiceOrder saved = persistStatusChange(so, ServiceOrderStatus.COMPLETED);
         otpService.generateAndSend(saved);
         notificationService.publishToRole(UserRole.ATTENDANT, NotificationType.EXECUTION_COMPLETED,
                 "OS " + osUuid + " concluída pelo mecânico. Cliente notificado para vistoria de entrega.", saved);
@@ -406,8 +401,7 @@ public class ServiceOrderService {
             otpService.validate(osUuid, customerDocument, tokenRaw);
         }
 
-        so.setStatus(ServiceOrderStatus.DELIVERED);
-        return buildResponse(serviceOrderRepository.save(so));
+        return buildResponse(persistStatusChange(so, ServiceOrderStatus.DELIVERED));
     }
 
     // -----------------------------------------------------------------------
@@ -420,8 +414,7 @@ public class ServiceOrderService {
         ServiceOrder so = findServiceOrder(osUuid);
         requireStatus(so, ServiceOrderStatus.COMPLETED);
 
-        so.setStatus(ServiceOrderStatus.IN_PROGRESS);
-        ServiceOrder saved = serviceOrderRepository.save(so);
+        ServiceOrder saved = persistStatusChange(so, ServiceOrderStatus.IN_PROGRESS);
 
         Quote quote = latestQuote(saved);
         int totalEstimatedMinutes = quote.getServiceLines().stream()
@@ -454,8 +447,7 @@ public class ServiceOrderService {
             throw new InvalidStatusTransitionException();
         }
 
-        so.setStatus(ServiceOrderStatus.DISPUTED);
-        ServiceOrder saved = serviceOrderRepository.save(so);
+        ServiceOrder saved = persistStatusChange(so, ServiceOrderStatus.DISPUTED);
 
         notificationService.publishToRole(UserRole.MECHANIC, NotificationType.ORDER_DISPUTED,
                 "OS " + osUuid + " encerrada como DISPUTED. Resolução: " + resolution, saved);
@@ -502,6 +494,18 @@ public class ServiceOrderService {
         if (so.getStatus() != required) {
             throw new InvalidStatusTransitionException();
         }
+    }
+
+    private ServiceOrder persistStatusChange(ServiceOrder so, ServiceOrderStatus newStatus) {
+        ServiceOrderStatus previousStatus = so.getStatus();
+        so.setStatus(newStatus);
+        ServiceOrder saved = serviceOrderRepository.save(so);
+        Customer customer = saved.getCustomer();
+        eventPublisher.publishEvent(new ServiceOrderStatusChangedEvent(
+                saved.getUuid(), previousStatus, saved.getStatus(),
+                customer != null ? customer.getEmail() : null,
+                customer != null ? customer.getName() : null));
+        return saved;
     }
 
     private Quote getOrCreateProvisionalQuote(ServiceOrder so) {

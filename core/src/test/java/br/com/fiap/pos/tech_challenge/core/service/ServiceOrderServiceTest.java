@@ -7,12 +7,15 @@ import br.com.fiap.pos.tech_challenge.core.exception.*;
 import br.com.fiap.pos.tech_challenge.core.mapper.ServiceOrderMapper;
 import br.com.fiap.pos.tech_challenge.core.repository.*;
 import br.com.fiap.pos.tech_challenge.core.security.UserDetailsImpl;
+import br.com.fiap.pos.tech_challenge.core.service.event.ServiceOrderStatusChangedEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -50,6 +53,7 @@ class ServiceOrderServiceTest {
     @Mock AuthenticationService authenticationService;
     @Mock UserRepository userRepository;
     @Mock ServiceOrderMapper mapper;
+    @Mock ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     ServiceOrderService sut;
@@ -87,6 +91,40 @@ class ServiceOrderServiceTest {
         assertThat(result.status()).isEqualTo(ServiceOrderStatus.RECEIVED);
     }
 
+    @Test
+    void openServiceOrder_publishesStatusEventWithNullPreviousStatus() {
+        UUID customerUuid = UUID.randomUUID();
+        UUID vehicleUuid = UUID.randomUUID();
+        UUID osUuid = UUID.randomUUID();
+
+        Customer customer = new Customer();
+        customer.setId(1L);
+        customer.setEmail("cliente@mail.com");
+        customer.setName("Cliente Teste");
+
+        Vehicle vehicle = new Vehicle();
+        vehicle.setCustomer(customer);
+
+        ServiceOrder saved = serviceOrderWithStatus(ServiceOrderStatus.RECEIVED);
+        saved.setUuid(osUuid);
+        saved.setCustomer(customer);
+
+        when(customerService.findEntityByUuid(customerUuid)).thenReturn(customer);
+        when(vehicleService.findEntityByUuid(vehicleUuid)).thenReturn(vehicle);
+        when(serviceOrderRepository.save(any())).thenReturn(saved);
+        when(mapper.toResponse(saved)).thenReturn(responseFor(saved));
+        when(quoteRepository.findFirstByServiceOrderIdOrderByCreatedAtDesc(any())).thenReturn(Optional.empty());
+
+        sut.openServiceOrder(customerUuid, vehicleUuid, "Barulho no motor");
+
+        ServiceOrderStatusChangedEvent event = publishedStatusEvent();
+        assertThat(event.serviceOrderUuid()).isEqualTo(osUuid);
+        assertThat(event.previousStatus()).isNull();
+        assertThat(event.newStatus()).isEqualTo(ServiceOrderStatus.RECEIVED);
+        assertThat(event.customerEmail()).isEqualTo("cliente@mail.com");
+        assertThat(event.customerName()).isEqualTo("Cliente Teste");
+    }
+
     // -------------------------------------------------------------------------
     // startDiagnosis
     // -------------------------------------------------------------------------
@@ -105,6 +143,10 @@ class ServiceOrderServiceTest {
         ServiceOrderResponse result = sut.startDiagnosis(uuid);
 
         assertThat(result.status()).isEqualTo(ServiceOrderStatus.IN_DIAGNOSIS);
+
+        ServiceOrderStatusChangedEvent event = publishedStatusEvent();
+        assertThat(event.previousStatus()).isEqualTo(ServiceOrderStatus.RECEIVED);
+        assertThat(event.newStatus()).isEqualTo(ServiceOrderStatus.IN_DIAGNOSIS);
     }
 
     @Test
@@ -231,6 +273,10 @@ class ServiceOrderServiceTest {
         ServiceOrderResponse result = sut.completeExecution(uuid);
 
         assertThat(result.status()).isEqualTo(ServiceOrderStatus.COMPLETED);
+
+        ServiceOrderStatusChangedEvent event = publishedStatusEvent();
+        assertThat(event.previousStatus()).isEqualTo(ServiceOrderStatus.IN_PROGRESS);
+        assertThat(event.newStatus()).isEqualTo(ServiceOrderStatus.COMPLETED);
     }
 
     @Test
@@ -309,6 +355,10 @@ class ServiceOrderServiceTest {
 
         assertThat(so.getStatus()).isEqualTo(ServiceOrderStatus.DISPUTED);
         assertThat(result).isNotNull();
+
+        ServiceOrderStatusChangedEvent event = publishedStatusEvent();
+        assertThat(event.previousStatus()).isEqualTo(ServiceOrderStatus.COMPLETED);
+        assertThat(event.newStatus()).isEqualTo(ServiceOrderStatus.DISPUTED);
     }
 
     // -------------------------------------------------------------------------
@@ -415,6 +465,10 @@ class ServiceOrderServiceTest {
         sut.approveQuote(uuid, "52998224725", "token");
 
         verify(stockService).debit(eq(productUuid), eq(new BigDecimal("2")), eq(so), isNull());
+
+        ServiceOrderStatusChangedEvent event = publishedStatusEvent();
+        assertThat(event.previousStatus()).isEqualTo(ServiceOrderStatus.AWAITING_APPROVAL);
+        assertThat(event.newStatus()).isEqualTo(ServiceOrderStatus.IN_PROGRESS);
     }
 
     // -------------------------------------------------------------------------
@@ -528,6 +582,10 @@ class ServiceOrderServiceTest {
 
         assertThat(so.getStatus()).isEqualTo(ServiceOrderStatus.CANCELLED);
         verify(serviceOrderRepository).save(so);
+
+        ServiceOrderStatusChangedEvent event = publishedStatusEvent();
+        assertThat(event.previousStatus()).isEqualTo(ServiceOrderStatus.AWAITING_APPROVAL);
+        assertThat(event.newStatus()).isEqualTo(ServiceOrderStatus.CANCELLED);
     }
 
     // -------------------------------------------------------------------------
@@ -569,6 +627,10 @@ class ServiceOrderServiceTest {
         verify(stockService).compensate(eq(productUuid), eq(BigDecimal.TWO), eq(so), any());
         verify(quoteRepository).save(quote);
         assertThat(so.getStatus()).isEqualTo(ServiceOrderStatus.IN_PROGRESS);
+
+        ServiceOrderStatusChangedEvent event = publishedStatusEvent();
+        assertThat(event.previousStatus()).isEqualTo(ServiceOrderStatus.AWAITING_APPROVAL);
+        assertThat(event.newStatus()).isEqualTo(ServiceOrderStatus.IN_PROGRESS);
     }
 
     // -----------------------------------------------------------------------
@@ -743,6 +805,10 @@ class ServiceOrderServiceTest {
 
         assertThat(so.getStatus()).isEqualTo(ServiceOrderStatus.DELIVERED);
         verify(otpService, never()).validate(any(), any(), any());
+
+        ServiceOrderStatusChangedEvent event = publishedStatusEvent();
+        assertThat(event.previousStatus()).isEqualTo(ServiceOrderStatus.COMPLETED);
+        assertThat(event.newStatus()).isEqualTo(ServiceOrderStatus.DELIVERED);
     }
 
     @Test
@@ -786,6 +852,10 @@ class ServiceOrderServiceTest {
         assertThat(so.getStatus()).isEqualTo(ServiceOrderStatus.IN_PROGRESS);
         verify(reworkCycleRepository).save(argThat(r -> r.getRejectionReason().equals("peças com defeito")));
         verify(notificationService).publishToRole(any(), any(), any(), eq(so));
+
+        ServiceOrderStatusChangedEvent event = publishedStatusEvent();
+        assertThat(event.previousStatus()).isEqualTo(ServiceOrderStatus.COMPLETED);
+        assertThat(event.newStatus()).isEqualTo(ServiceOrderStatus.IN_PROGRESS);
     }
 
     // -----------------------------------------------------------------------
@@ -891,6 +961,10 @@ class ServiceOrderServiceTest {
         assertThat(so.getApprovalExpiresAt()).isNotNull();
         verify(otpService).generateAndSend(so);
         assertThat(result).isNotNull();
+
+        ServiceOrderStatusChangedEvent event = publishedStatusEvent();
+        assertThat(event.previousStatus()).isEqualTo(ServiceOrderStatus.IN_DIAGNOSIS);
+        assertThat(event.newStatus()).isEqualTo(ServiceOrderStatus.AWAITING_APPROVAL);
     }
 
     @Test
@@ -937,6 +1011,10 @@ class ServiceOrderServiceTest {
         assertThat(so.getStatus()).isEqualTo(ServiceOrderStatus.AWAITING_APPROVAL);
         assertThat(so.getApprovalExpiresAt()).isNotNull();
         verify(otpService).generateAndSend(so);
+
+        ServiceOrderStatusChangedEvent event = publishedStatusEvent();
+        assertThat(event.previousStatus()).isEqualTo(ServiceOrderStatus.IN_PROGRESS);
+        assertThat(event.newStatus()).isEqualTo(ServiceOrderStatus.AWAITING_APPROVAL);
     }
 
     @Test
@@ -1092,6 +1170,13 @@ class ServiceOrderServiceTest {
         ServiceOrder so = new ServiceOrder();
         so.setStatus(status);
         return so;
+    }
+
+    private ServiceOrderStatusChangedEvent publishedStatusEvent() {
+        ArgumentCaptor<ServiceOrderStatusChangedEvent> captor =
+                ArgumentCaptor.forClass(ServiceOrderStatusChangedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        return captor.getValue();
     }
 
     private ServiceOrderResponse responseFor(ServiceOrder so) {
