@@ -2,7 +2,10 @@ package br.com.fiap.pos.tech_challenge.core.controller;
 
 import br.com.fiap.pos.tech_challenge.core.controller.dto.*;
 import br.com.fiap.pos.tech_challenge.core.enums.ServiceOrderStatus;
+import br.com.fiap.pos.tech_challenge.core.exception.ExceptionHandling;
+import br.com.fiap.pos.tech_challenge.core.exception.ProductNotFoundException;
 import br.com.fiap.pos.tech_challenge.core.service.ServiceOrderService;
+import br.com.fiap.pos.tech_challenge.core.util.Translator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -24,6 +27,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -63,12 +67,51 @@ class ServiceOrderControllerTest {
         void open_returns201OnSuccess() throws Exception {
             OpenServiceOrderRequest request = new OpenServiceOrderRequest(
                     UUID.randomUUID(), UUID.randomUUID(), "Barulho no motor", null, null);
-            when(service.openServiceOrder(any(), any(), any())).thenReturn(stubResponse());
+            when(service.openServiceOrder(any(), any(), any(), any(), any())).thenReturn(stubResponse());
 
             mockMvc.perform(post("/api/service-orders")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isCreated());
+        }
+
+        @Test
+        void open_forwardsOptionalItemsToService() throws Exception {
+            UUID customerUuid = UUID.randomUUID();
+            UUID vehicleUuid = UUID.randomUUID();
+            UUID msUuid = UUID.randomUUID();
+            UUID productUuid = UUID.randomUUID();
+            OpenServiceOrderRequest request = new OpenServiceOrderRequest(
+                    customerUuid, vehicleUuid, "Revisão",
+                    java.util.List.of(msUuid),
+                    java.util.List.of(new OpenProductItemRequest(productUuid, java.math.BigDecimal.ONE)));
+            when(service.openServiceOrder(any(), any(), any(), any(), any())).thenReturn(stubResponse());
+
+            mockMvc.perform(post("/api/service-orders")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isCreated());
+
+            verify(service).openServiceOrder(customerUuid, vehicleUuid, "Revisão",
+                    java.util.List.of(msUuid),
+                    java.util.List.of(new OpenProductItemRequest(productUuid, java.math.BigDecimal.ONE)));
+        }
+
+        @Test
+        void open_returns404WhenProductDoesNotExist() throws Exception {
+            MockMvc mockMvcWithAdvice = MockMvcBuilders.standaloneSetup(controller)
+                    .setControllerAdvice(new ExceptionHandling(mock(Translator.class)))
+                    .build();
+            OpenServiceOrderRequest request = new OpenServiceOrderRequest(
+                    UUID.randomUUID(), UUID.randomUUID(), "Revisão", null,
+                    java.util.List.of(new OpenProductItemRequest(UUID.randomUUID(), java.math.BigDecimal.ONE)));
+            when(service.openServiceOrder(any(), any(), any(), any(), any()))
+                    .thenThrow(new ProductNotFoundException());
+
+            mockMvcWithAdvice.perform(post("/api/service-orders")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isNotFound());
         }
     }
 
