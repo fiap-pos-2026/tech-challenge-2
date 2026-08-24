@@ -1,9 +1,12 @@
 package br.com.fiap.pos.tech_challenge.core.controller;
 
 import br.com.fiap.pos.tech_challenge.core.controller.dto.*;
+import br.com.fiap.pos.tech_challenge.core.enums.EApplicationError;
 import br.com.fiap.pos.tech_challenge.core.enums.ServiceOrderStatus;
+import br.com.fiap.pos.tech_challenge.core.exception.CustomerNotFoundException;
 import br.com.fiap.pos.tech_challenge.core.exception.ExceptionHandling;
 import br.com.fiap.pos.tech_challenge.core.exception.ProductNotFoundException;
+import br.com.fiap.pos.tech_challenge.core.exception.VehicleNotFoundException;
 import br.com.fiap.pos.tech_challenge.core.service.ServiceOrderService;
 import br.com.fiap.pos.tech_challenge.core.util.Translator;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -31,6 +34,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -112,6 +116,42 @@ class ServiceOrderControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isNotFound());
+        }
+
+        @Test
+        void open_returns404WhenCustomerDoesNotExist() throws Exception {
+            MockMvc mockMvcWithAdvice = MockMvcBuilders.standaloneSetup(controller)
+                    .setControllerAdvice(new ExceptionHandling(mock(Translator.class)))
+                    .build();
+            OpenServiceOrderRequest request = new OpenServiceOrderRequest(
+                    UUID.randomUUID(), UUID.randomUUID(), "Barulho no motor", null, null);
+            when(service.openServiceOrder(any(), any(), any(), any(), any()))
+                    .thenThrow(new CustomerNotFoundException());
+
+            mockMvcWithAdvice.perform(post("/api/service-orders")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.errorCode")
+                            .value(EApplicationError.CUSTOMER_NOT_FOUND.getErrorCode()));
+        }
+
+        @Test
+        void open_returns404WhenVehicleDoesNotExist() throws Exception {
+            MockMvc mockMvcWithAdvice = MockMvcBuilders.standaloneSetup(controller)
+                    .setControllerAdvice(new ExceptionHandling(mock(Translator.class)))
+                    .build();
+            OpenServiceOrderRequest request = new OpenServiceOrderRequest(
+                    UUID.randomUUID(), UUID.randomUUID(), "Barulho no motor", null, null);
+            when(service.openServiceOrder(any(), any(), any(), any(), any()))
+                    .thenThrow(new VehicleNotFoundException());
+
+            mockMvcWithAdvice.perform(post("/api/service-orders")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.errorCode")
+                            .value(EApplicationError.VEHICLE_NOT_FOUND.getErrorCode()));
         }
     }
 

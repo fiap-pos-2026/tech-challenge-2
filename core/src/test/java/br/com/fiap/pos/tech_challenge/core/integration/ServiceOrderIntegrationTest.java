@@ -11,7 +11,9 @@ import br.com.fiap.pos.tech_challenge.core.enums.DocumentType;
 import br.com.fiap.pos.tech_challenge.core.enums.MeasurementUnit;
 import br.com.fiap.pos.tech_challenge.core.enums.ProductType;
 import br.com.fiap.pos.tech_challenge.core.enums.ServiceOrderStatus;
+import br.com.fiap.pos.tech_challenge.core.exception.CustomerNotFoundException;
 import br.com.fiap.pos.tech_challenge.core.exception.ProductNotFoundException;
+import br.com.fiap.pos.tech_challenge.core.exception.VehicleNotFoundException;
 import br.com.fiap.pos.tech_challenge.core.repository.CustomerRepository;
 import br.com.fiap.pos.tech_challenge.core.repository.MechanicalServiceRepository;
 import br.com.fiap.pos.tech_challenge.core.repository.ProductRepository;
@@ -147,6 +149,28 @@ class ServiceOrderIntegrationTest extends BaseIntegrationTest {
                 List.of(new OpenProductItemRequest(UUID.randomUUID(), BigDecimal.ONE))))
                 .isInstanceOf(ProductNotFoundException.class)
                 .extracting(e -> ((ProductNotFoundException) e).getStatus())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+
+        assertThat(serviceOrderRepository.count()).isZero();
+    }
+
+    @Test
+    void openServiceOrder_withUnknownCustomer_returnsNotFoundAndLeavesNoOrphanOrder() {
+        assertThatThrownBy(() -> serviceOrderService.openServiceOrder(
+                UUID.randomUUID(), vehicle.getUuid(), "Barulho no motor"))
+                .isInstanceOf(CustomerNotFoundException.class)
+                .extracting(e -> ((CustomerNotFoundException) e).getStatus())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+
+        assertThat(serviceOrderRepository.count()).isZero();
+    }
+
+    @Test
+    void openServiceOrder_withUnknownVehicle_returnsNotFoundAndLeavesNoOrphanOrder() {
+        assertThatThrownBy(() -> serviceOrderService.openServiceOrder(
+                customer.getUuid(), UUID.randomUUID(), "Barulho no motor"))
+                .isInstanceOf(VehicleNotFoundException.class)
+                .extracting(e -> ((VehicleNotFoundException) e).getStatus())
                 .isEqualTo(HttpStatus.NOT_FOUND);
 
         assertThat(serviceOrderRepository.count()).isZero();
