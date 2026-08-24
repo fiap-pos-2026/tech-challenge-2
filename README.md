@@ -1,8 +1,11 @@
 # The Java Garage — Sistema de Atendimento e Execução de Serviços
 
-> **Tech Challenge — Fase 1 | Pós Tech FIAP 15SOAT**
+> **Tech Challenge — Fase 1 e Fase 2 | Pós Tech FIAP 15SOAT**
 
-Back-end MVP do sistema integrado de atendimento para oficina mecânica, com foco em gestão de ordens de serviço, clientes e peças, aplicando **Domain-Driven Design (DDD)** e boas práticas de **qualidade de software e segurança**.
+Back-end do sistema integrado de atendimento para oficina mecânica, com foco em gestão de ordens de
+serviço, clientes e peças, aplicando **Domain-Driven Design (DDD)** sobre uma **Clean Architecture**,
+com qualidade de software, segurança e, na Fase 2, orquestração em Kubernetes, infraestrutura como
+código e pipeline de CI/CD.
 
 ---
 
@@ -13,9 +16,22 @@ Uma oficina mecânica de médio porte utilizava anotações manuais e planilhas 
 O sistema resolve esses problemas permitindo:
 
 - Acompanhar o andamento da OS em tempo real via API (sem necessidade de login)
+- Receber e-mail a cada mudança de status da OS
 - Autorizar ou rejeitar orçamentos diretamente pelo cliente via link/OTP
 - Controlar estoque de peças e insumos com auditoria por movimentação
 - Gerenciar toda a operação interna com autenticação JWT por papel (Mecânico / Atendente)
+
+### Objetivos da Fase 2
+
+A Fase 2 evolui o back-end da Fase 1 para atender qualidade, resiliência e escalabilidade sem trocar
+o modelo arquitetural:
+
+- Abertura de OS com serviços e peças opcionais já no ato do cadastro
+- Listagem priorizada de OS (ordem de negócio + exclusão de Finalizada/Entregue por padrão)
+- Notificação do cliente por e-mail a cada mudança de status da OS
+- Deploy em **microk8s** local via **Kustomize**, com HPA, ConfigMaps e Secrets
+- Infraestrutura de apoio (namespace, PostgreSQL, Redis) provisionada via **Terraform**
+- **Pipeline CI/CD** (GitHub Actions, runner self-hosted) rodando build, testes, imagem e deploy
 
 ---
 
@@ -55,12 +71,16 @@ RECEIVED → IN_DIAGNOSIS → AWAITING_APPROVAL → IN_PROGRESS → COMPLETED �
                                                    └──► DISPUTED           (rejeição persistente na vistoria de entrega)
 ```
 
+A cada transição de status persistida com sucesso (inclusive a abertura, que "transiciona" para
+`RECEIVED`), o cliente recebe um e-mail com o identificador da OS e o novo status. Falha de SMTP é
+registrada em log e **não** reverte a transição já persistida.
+
 ### Linguagem Ubíqua
 
 | Termo | Definição |
 |---|---|
 | **Ordem de Serviço (OS)** | Registro central do atendimento; agrega serviços, produtos, orçamento e status. |
-| **Orçamento** | Composição de valores gerada automaticamente após o diagnóstico. |
+| **Orçamento** | Composição de valores gerada automaticamente após o diagnóstico (ou já na abertura, se houver itens). |
 | **Aprovação de Orçamento** | Ação do Cliente autorizando a execução via OTP, sem necessidade de conta. |
 | **Produto** | Termo guarda-chuva para Peças e Insumos controlados no estoque. |
 | **Atendente** | Colaborador responsável pelo cadastro e acompanhamento administrativo da OS. |
@@ -82,39 +102,51 @@ RECEIVED → IN_DIAGNOSIS → AWAITING_APPROVAL → IN_PROGRESS → COMPLETED �
 | Documentação | Springdoc OpenAPI 3 (Swagger UI) |
 | Testes de integração | Testcontainers |
 | Cobertura | JaCoCo (gate ≥ 80% nos domínios críticos) |
+| Orquestração (Fase 2) | Kubernetes (microk8s) via Kustomize |
+| IaC (Fase 2) | Terraform |
+| CI/CD (Fase 2) | GitHub Actions (runner self-hosted) |
 
 ### Arquitetura
 
-Back-end monolítico com arquitetura em camadas (MVC clássico):
+Back-end monolítico em **Clean Architecture** — camadas concêntricas onde regras de negócio não
+dependem de frameworks web ou de persistência:
 
 ```
-controller/   →  @RestController com DTOs de request/response
-service/      →  Lógica de negócio (@Service)
-repository/   →  Interfaces Spring Data JPA
-domain/       →  Entidades JPA + enums de domínio
-security/     →  Filtros JWT, autenticação, autorização por role
+controller/   →  Interface adapters: @RestController + DTOs de request/response
+service/      →  Casos de uso / regras de aplicação (@Service)
+domain/       →  Entidades de domínio + enums (núcleo, sem dependência de framework)
+repository/   →  Interfaces Spring Data JPA (porta de saída para persistência)
+security/     →  Filtros JWT, autenticação, autorização por role (infraestrutura)
 validation/   →  @ValidTaxId (CPF/CNPJ), @ValidLicensePlate
 scheduler/    →  Expiração automática de orçamentos (7 dias)
 ```
+
+A Fase 2 manteve deliberadamente a Clean Architecture já adotada na Fase 1 — **não houve migração
+para Hexagonal/ports-and-adapters**; os gaps de API e a fatia de plataforma (Kustomize, Terraform,
+CI/CD) foram entregues sobre o layout existente.
 
 ---
 
 ## Pré-requisitos
 
-- **Docker** e **Docker Compose** (recomendado)
+- **Docker** e **Docker Compose** (recomendado para execução local)
 - **JDK 25+** e **Gradle** (para execução local sem Docker)
+- **microk8s** (WSL2) + `kubectl` com plugin Kustomize — para deploy em Kubernetes
+- **Terraform** ≥ 1.6 — para provisionar namespace/PostgreSQL/Redis via `/infra`
 
 ---
 
 ## Como Executar
 
-### Com Docker Compose (recomendado)
+### Com Docker Compose (recomendado para desenvolvimento)
 
 ```bash
 docker-compose up --build
 ```
 
-Isso sobe a aplicação, o PostgreSQL, o Redis e o Mailpit (servidor SMTP local para OTPs em desenvolvimento). A aplicação estará disponível em `http://localhost:8080/core`.
+Isso sobe a aplicação, o PostgreSQL, o Redis e o Mailpit (servidor SMTP local que captura os e-mails
+de OTP e de notificação de status em desenvolvimento — acesse `http://localhost:8025`). A aplicação
+estará disponível em `http://localhost:8080/core`.
 
 Para parar:
 
@@ -142,6 +174,52 @@ A aplicação sobe em `http://localhost:8080/core`.
 
 Swagger UI disponível em: `http://localhost:8080/core/swagger-ui.html`
 
+### Kubernetes local (microk8s + Kustomize)
+
+Manifests em `/k8s`, organizados em `base` (Deployment, Service, ConfigMap, Secret de exemplo, HPA) e
+overlay `local` (imagem do registry embutido do microk8s, NodePort, requests reduzidos para o nó
+único do WSL2):
+
+```bash
+# 1. Publique a imagem no registry do microk8s (ver k8s/overlays/local/README.md)
+microk8s enable registry
+docker build -f core/Dockerfile -t localhost:32000/tech-challenge-core:local .
+docker push localhost:32000/tech-challenge-core:local
+
+# 2. Provisione namespace + PostgreSQL + Redis (ver seção Terraform abaixo)
+
+# 3. Crie o Secret real (fora do git) — ver k8s/base/secret.example.yaml
+
+# 4. Aplique o Kustomize
+kubectl kustomize k8s/overlays/local     # revisa o resultado
+kubectl apply -k k8s/overlays/local
+```
+
+A aplicação responde em `http://<ip-do-node>:30080/core`. Detalhes completos em
+[`k8s/overlays/local/README.md`](k8s/overlays/local/README.md).
+
+### Terraform (infraestrutura de apoio)
+
+O diretório `/infra` provisiona, via Terraform, o namespace e as dependências de dados
+(PostgreSQL, Redis) **sobre um microk8s já instalado** — o Terraform não instala o cluster:
+
+```bash
+cd infra
+terraform init
+cp terraform.tfvars.example terraform.tfvars   # defina db_password real
+terraform plan -var-file=terraform.tfvars
+terraform apply -var-file=terraform.tfvars
+```
+
+Passo a passo completo, variáveis e outputs em [`infra/README.md`](infra/README.md).
+
+### CI/CD
+
+O workflow [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml) roda em runner
+**self-hosted** (WSL2 com acesso ao microk8s) e encadeia: build → testes → imagem Docker →
+`terraform apply` → `kubectl apply -k k8s/overlays/local`. Falha em build ou testes interrompe a
+cadeia e bloqueia o deploy.
+
 ---
 
 ## Variáveis de Ambiente
@@ -153,16 +231,18 @@ As chaves de desenvolvimento já estão em `core/src/main/resources/certs/`. **N
 Para produção, forneça via variáveis de ambiente:
 
 ```
-JWT_PUBLIC_KEY=<conteúdo da chave pública PEM>
-JWT_PRIVATE_KEY=<conteúdo da chave privada PEM>
+JWT_PUBLIC_KEY=<conteúdo ou caminho file: da chave pública PEM>
+JWT_PRIVATE_KEY=<conteúdo ou caminho file: da chave privada PEM>
 ```
 
 ### Banco de Dados
 
 ```
-DB_URL=jdbc:postgresql://localhost:5432/techbase
-DB_USERNAME=techdev
-DB_PASSWORD=techdevpw
+JDBC_HOST=localhost
+JDBC_PORT=5432
+JDBC_SERVICENAME=techbase
+JDBC_USERNAME=techdev
+JDBC_PASSWORD=techdevpw
 ```
 
 ### Redis
@@ -173,9 +253,9 @@ REDIS_PORT=6379
 ```
 
 Introduzido exclusivamente para suportar a funcionalidade de log-out com invalidação imediata de tokens JWT, 
-implementada via blacklist. No docker-compose já está configurado apontando para o container `redis`.
+implementada via blacklist. No docker-compose e no Kustomize já está configurado apontando para o serviço `redis`.
 
-### E-mail (OTP)
+### E-mail (OTP e notificação de status)
 
 ```
 MAIL_HOST=smtp.seu-provedor.com
@@ -186,7 +266,9 @@ MAIL_SMTP_AUTH=true
 MAIL_SMTP_STARTTLS=true
 ```
 
-Em desenvolvimento, o docker-compose sobe um **Mailpit** em `http://localhost:8025` que captura os e-mails localmente sem enviá-los.
+Em desenvolvimento, o docker-compose sobe um **Mailpit** em `http://localhost:8025` que captura
+localmente tanto os e-mails de OTP quanto os de notificação de mudança de status, sem enviá-los de
+fato.
 
 ### Senha Inicial do Administrador
 
@@ -266,8 +348,8 @@ Após o primeiro login, o sistema bloqueia todas as operações e exige a troca 
 
 | Método | Caminho | Papel | Descrição |
 |---|---|---|---|
-| `POST` | `/api/service-orders` | ATTENDANT | Abrir OS com queixa do cliente |
-| `GET` | `/api/service-orders` | ATTENDANT, MECHANIC | Listar OSs (filtros: status, customerUuid, from, to) |
+| `POST` | `/api/service-orders` | ATTENDANT | Abrir OS com queixa do cliente e, opcionalmente, serviços/peças já na abertura (orçamento provisório) |
+| `GET` | `/api/service-orders` | ATTENDANT, MECHANIC | Listar OSs priorizadas (`IN_PROGRESS` > `AWAITING_APPROVAL` > `IN_DIAGNOSIS` > `RECEIVED`, depois `createdAt` ASC); exclui `COMPLETED`/`DELIVERED` por padrão; filtros: `status`, `customerUuid`, `from`, `to` |
 | `GET` | `/api/service-orders/{uuid}` | ATTENDANT, MECHANIC | Detalhar OS |
 | `GET` | `/api/service-orders/{uuid}/status` | **Público** | Consultar status da OS (cliente) |
 | `POST` | `/api/service-orders/{uuid}/diagnosis/start` | MECHANIC | Iniciar diagnóstico |
@@ -284,6 +366,9 @@ Após o primeiro login, o sistema bloqueia todas as operações e exige a troca 
 | `POST` | `/api/service-orders/{uuid}/delivery/reject` | **Público (OTP)** | Rejeitar vistoria de entrega |
 | `POST` | `/api/service-orders/{uuid}/close-dispute` | ATTENDANT | Encerrar OS como DISPUTED |
 
+Toda transição de status persistida com sucesso — incluindo a abertura — dispara e-mail ao cliente
+com o identificador da OS e o novo status (falha de SMTP é logada e não reverte a transição).
+
 ### Fluxo de status (happy path)
 
 ```
@@ -292,11 +377,12 @@ RECEIVED → IN_DIAGNOSIS → AWAITING_APPROVAL → IN_PROGRESS → COMPLETED �
 
 ---
 
-## Postman Collection
+## Postman Collection e Swagger
 
-O arquivo `collections/tech-challenge.postman_collection.json` contém todas as requisições organizadas por domínio de negócio e fluxos de uso.
+- **Swagger UI**: `http://localhost:8080/core/swagger-ui.html` (com a aplicação rodando localmente)
+- **Postman Collection**: [`collections/tech-challenge.postman_collection.json`](collections/tech-challenge.postman_collection.json) — todas as requisições organizadas por domínio de negócio e fluxos de uso, incluindo abertura de OS com itens opcionais e listagem priorizada
 
-### Importando
+### Importando a collection
 
 1. Abra o Postman
 2. Clique em **Import**
@@ -317,8 +403,6 @@ O arquivo `collections/tech-challenge.postman_collection.json` contém todas as 
 | `productUuid` | UUID do produto no inventário |
 
 ### Fluxo completo de teste (happy path)
-
-Execute a pasta **Setup** completa primeiro — ela cria usuários, faz login e salva todos os UUIDs nas variáveis acima. Em seguida:
 
 ```
 Setup (pasta completa)
@@ -348,22 +432,14 @@ Setup (pasta completa)
 # Verificação do gate de cobertura (≥ 80% nos domínios críticos)
 ./gradlew :core:jacocoTestCoverageVerification
 
+# Build completo (usado como gate de CI)
+./gradlew :core:build -x dependencyCheckAnalyze
+
 # Análise de dependências OWASP
 ./gradlew :core:dependencyCheckAnalyze
 ```
 
 Os testes de integração sobem um PostgreSQL real via Testcontainers — o Docker precisa estar rodando.
-
-**Suítes de teste:**
-
-| Suíte | Testes | Cobertura |
-|---|---|---|
-| `ServiceOrderServiceTest` | 21 | Máquina de estados, orçamento, retrabalho, OTP, entrega |
-| `StockServiceTest` | 7 | Débito, reposição, devolução, saldo insuficiente |
-| `TaxIdValidatorTest` | 12 | Validação CPF e CNPJ (Módulo 11) |
-| `LicensePlateValidatorTest` | 10 | Placas formato antigo e Mercosul |
-| `SecurityIntegrationTest` | 8 | Autenticação JWT (banco real) |
-| `ServiceOrderIntegrationTest` | 6 | Fluxo completo de OS (banco real) |
 
 ---
 
@@ -381,6 +457,14 @@ Os testes de integração sobem um PostgreSQL real via Testcontainers — o Dock
 - **Placa de veículo** — formatos antigo (`AAA9999`) e Mercosul (`AAA9A99`) via regex (`@ValidLicensePlate`)
 - **Senhas** — BCrypt; complexidade mínima: 8 caracteres, ao menos uma maiúscula, um número e um símbolo
 - **Sem stack trace** — respostas de erro padronizadas via `@ControllerAdvice`; nunca expõem detalhes internos
+
+### Segredos (Kubernetes / Terraform)
+
+- Valores sensíveis (senha do banco, credenciais SMTP, chaves JWT) **nunca** entram no git — apenas
+  exemplos/placeholders (`k8s/base/secret.example.yaml`, `infra/terraform.tfvars.example`)
+- `k8s/.gitignore` e `infra/.gitignore` bloqueiam `secret.yaml`, `*.pem`, `*.tfstate` e `*.tfvars` reais
+- Segredos reais são criados diretamente no cluster (`kubectl create secret`) ou via variável
+  `TF_VAR_db_password` / secrets do runner self-hosted no CI
 
 ### OWASP A07:2021 — Identification and Authentication Failures
 
@@ -429,4 +513,4 @@ O **PostgreSQL 18.4** foi escolhido pelas seguintes razões:
 - **Modelo relacional alinhado ao domínio** — a OS centraliza relacionamentos entre `Customer`, `Vehicle`, `MechanicalService`, `Product` e `Quote`; o modelo relacional evita redundância e garante consistência referencial por FK.
 - **Suporte maduro a JPA/Hibernate e Liquibase** — dialeto Hibernate estável; Liquibase tem suporte de primeira classe, permitindo migrações versionadas e reversíveis.
 - **Compatibilidade com Testcontainers** — imagem oficial `postgres:18.4-alpine` usada nos testes de integração garante o mesmo banco em dev, teste e produção, eliminando discrepâncias de comportamento.
-- **Custo e operação acessíveis** — para um sistema monolítico de oficina de porte médio, PostgreSQL gerenciado (RDS, Supabase, etc.) tem custo baixo e sem sobrecarga operacional.
+- **Custo e operação acessíveis** — para um sistema monolítico de oficina de porte médio, PostgreSQL gerenciado (RDS, Supabase, etc.) ou em cluster próprio (microk8s/Terraform) tem custo baixo e sem sobrecarga operacional.
