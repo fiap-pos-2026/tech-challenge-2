@@ -10,5 +10,9 @@ labels:
       app.kubernetes.io/part-of: tech-challenge
 
 resources:
+  - configmap.yaml
   - deployment.yaml
   - service.yaml
+  - hpa.yaml
+
+# secret.example.yaml é só template: o Secret real é criado no cluster, fora do git

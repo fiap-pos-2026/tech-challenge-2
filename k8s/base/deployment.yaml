@@ -20,28 +20,10 @@ spec:
           ports:
             - name: http
               containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: tech-challenge-core-config
           env:
-            - name: SPRING_PROFILES_ACTIVE
-              value: prd
-            - name: JDBC_HOST
-              value: postgres
-            - name: JDBC_PORT
-              value: "5432"
-            - name: JDBC_SERVICENAME
-              value: techbase
-            - name: REDIS_HOST
-              value: redis
-            - name: REDIS_PORT
-              value: "6379"
-            - name: MAIL_HOST
-              value: mailpit
-            - name: MAIL_PORT
-              value: "1025"
-            # Os PEMs vêm do Secret montado em /run/certs (nunca da imagem)
-            - name: JWT_PUBLIC_KEY
-              value: file:/run/certs/public.pem
-            - name: JWT_PRIVATE_KEY
-              value: file:/run/certs/private.pem
             - name: JDBC_USERNAME
               valueFrom:
                 secretKeyRef:

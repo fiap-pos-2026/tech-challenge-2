@@ -1,0 +1,4 @@
+# Secrets reais nunca entram no repositório — apenas secret.example.yaml
+secret.yaml
+*.secret.yaml
+*.pem
