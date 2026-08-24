@@ -1,5 +1,6 @@
 package br.com.fiap.pos.tech_challenge.core.scheduler;
 
+import br.com.fiap.pos.tech_challenge.core.domain.Customer;
 import br.com.fiap.pos.tech_challenge.core.domain.ServiceOrder;
 import br.com.fiap.pos.tech_challenge.core.enums.NotificationType;
 import br.com.fiap.pos.tech_challenge.core.enums.ServiceOrderStatus;
@@ -7,8 +8,10 @@ import br.com.fiap.pos.tech_challenge.core.enums.UserRole;
 import br.com.fiap.pos.tech_challenge.core.repository.ServiceOrderRepository;
 import br.com.fiap.pos.tech_challenge.core.service.NotificationService;
 import br.com.fiap.pos.tech_challenge.core.service.OTPService;
+import br.com.fiap.pos.tech_challenge.core.service.event.ServiceOrderStatusChangedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +31,7 @@ public class QuoteExpirationScheduler {
     private final ServiceOrderRepository serviceOrderRepository;
     private final OTPService otpService;
     private final NotificationService notificationService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Scheduled(fixedDelay = 300_000)
     @Transactional
@@ -36,13 +40,23 @@ public class QuoteExpirationScheduler {
                 .findByStatusAndApprovalExpiresAtBefore(ServiceOrderStatus.AWAITING_APPROVAL, Instant.now());
 
         for (ServiceOrder so : expired) {
+            ServiceOrderStatus previousStatus = so.getStatus();
             so.setStatus(ServiceOrderStatus.CANCELLED);
             otpService.invalidateByServiceOrder(so);
             notificationService.publishToRole(UserRole.ATTENDANT, NotificationType.QUOTE_EXPIRED,
                     "OS " + so.getUuid() + " cancelada por expiração do orçamento.", so);
+            publishStatusChanged(so, previousStatus);
             log.info("OS {} cancelada por expiração do orçamento.", so.getUuid());
         }
 
         serviceOrderRepository.saveAll(expired);
+    }
+
+    private void publishStatusChanged(ServiceOrder so, ServiceOrderStatus previousStatus) {
+        Customer customer = so.getCustomer();
+        eventPublisher.publishEvent(new ServiceOrderStatusChangedEvent(
+                so.getUuid(), previousStatus, so.getStatus(),
+                customer != null ? customer.getEmail() : null,
+                customer != null ? customer.getName() : null));
     }
 }
