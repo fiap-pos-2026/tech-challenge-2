@@ -11,6 +11,8 @@ import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.UUID;
 
@@ -27,6 +29,16 @@ import static org.mockito.Mockito.*;
 class StatusEmailNotifierTest {
 
     @InjectMocks StatusEmailNotifier sut;
+
+    @Test
+    void onStatusChanged_listensOnlyAfterCommitSoEmailIsOutsideTheDomainTransaction() throws Exception {
+        TransactionalEventListener listener = StatusEmailNotifier.class
+                .getDeclaredMethod("onStatusChanged", ServiceOrderStatusChangedEvent.class)
+                .getAnnotation(TransactionalEventListener.class);
+
+        assertThat(listener).isNotNull();
+        assertThat(listener.phase()).isEqualTo(TransactionPhase.AFTER_COMMIT);
+    }
 
     @Test
     void onStatusChanged_sendsEmailToCustomerWithOrderUuidAndNewStatus() {
