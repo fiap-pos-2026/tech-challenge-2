@@ -28,9 +28,30 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long
 
     List<ServiceOrder> findByStatusAndApprovalExpiresAtBefore(ServiceOrderStatus status, Instant cutoff);
 
-    @Query("""
+    @Query(value = """
             SELECT so FROM ServiceOrder so
             WHERE (:status IS NULL OR so.status = :status)
+              AND (:status IS NOT NULL OR so.status NOT IN (
+                    br.com.fiap.pos.tech_challenge.core.enums.ServiceOrderStatus.COMPLETED,
+                    br.com.fiap.pos.tech_challenge.core.enums.ServiceOrderStatus.DELIVERED))
+              AND (:customerUuid IS NULL OR so.customer.uuid = :customerUuid)
+              AND (CAST(:from AS TIMESTAMP) IS NULL OR so.createdAt >= :from)
+              AND (CAST(:to AS TIMESTAMP) IS NULL OR so.createdAt <= :to)
+            ORDER BY CASE
+                       WHEN so.status = br.com.fiap.pos.tech_challenge.core.enums.ServiceOrderStatus.IN_PROGRESS THEN 1
+                       WHEN so.status = br.com.fiap.pos.tech_challenge.core.enums.ServiceOrderStatus.AWAITING_APPROVAL THEN 2
+                       WHEN so.status = br.com.fiap.pos.tech_challenge.core.enums.ServiceOrderStatus.IN_DIAGNOSIS THEN 3
+                       WHEN so.status = br.com.fiap.pos.tech_challenge.core.enums.ServiceOrderStatus.RECEIVED THEN 4
+                       ELSE 5
+                     END ASC,
+                     so.createdAt ASC
+            """,
+            countQuery = """
+            SELECT COUNT(so) FROM ServiceOrder so
+            WHERE (:status IS NULL OR so.status = :status)
+              AND (:status IS NOT NULL OR so.status NOT IN (
+                    br.com.fiap.pos.tech_challenge.core.enums.ServiceOrderStatus.COMPLETED,
+                    br.com.fiap.pos.tech_challenge.core.enums.ServiceOrderStatus.DELIVERED))
               AND (:customerUuid IS NULL OR so.customer.uuid = :customerUuid)
               AND (CAST(:from AS TIMESTAMP) IS NULL OR so.createdAt >= :from)
               AND (CAST(:to AS TIMESTAMP) IS NULL OR so.createdAt <= :to)

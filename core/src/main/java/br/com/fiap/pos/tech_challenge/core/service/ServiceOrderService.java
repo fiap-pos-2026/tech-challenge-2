@@ -24,7 +24,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -478,13 +480,22 @@ public class ServiceOrderService {
                                                          LocalDateTime from, LocalDateTime to,
                                                          Pageable pageable) {
         return serviceOrderRepository
-                .findWithFilters(status, customerUuid, from, to, pageable)
+                .findWithFilters(status, customerUuid, from, to, withoutClientSort(pageable))
                 .map(this::buildResponse);
     }
 
     // -----------------------------------------------------------------------
     // Private helpers
     // -----------------------------------------------------------------------
+    // A ordem de prioridade da listagem é definida na query; o sort enviado pelo client é descartado
+    // para não sobrescrevê-la.
+    private Pageable withoutClientSort(Pageable pageable) {
+        if (pageable == null || pageable.isUnpaged()) {
+            return Pageable.unpaged();
+        }
+        return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.unsorted());
+    }
+
     private ServiceOrder findServiceOrder(UUID uuid) {
         return serviceOrderRepository.findByUuid(uuid)
                 .orElseThrow(ServiceOrderNotFoundException::new);
