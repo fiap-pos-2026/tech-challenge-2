@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+# Registry embutido do microk8s (`microk8s enable registry`) — publique a imagem antes do apply
+images:
+  - name: tech-challenge-core
+    newName: localhost:32000/tech-challenge-core
+    newTag: local
+
+patches:
+  - path: patch-service-nodeport.yaml
+  - path: patch-deployment-local.yaml
