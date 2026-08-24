@@ -1,6 +1,7 @@
 package br.com.fiap.pos.tech_challenge.core.integration;
 
 import br.com.fiap.pos.tech_challenge.core.controller.dto.OpenProductItemRequest;
+import br.com.fiap.pos.tech_challenge.core.controller.dto.ServiceOrderResponse;
 import br.com.fiap.pos.tech_challenge.core.domain.Customer;
 import br.com.fiap.pos.tech_challenge.core.domain.MechanicalService;
 import br.com.fiap.pos.tech_challenge.core.domain.Product;
@@ -23,6 +24,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -30,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -95,6 +99,16 @@ class ServiceOrderIntegrationTest extends BaseIntegrationTest {
         product.setUnitPrice(new BigDecimal("45.00"));
         product.setAvailableQuantity(new BigDecimal("10.0000"));
         return product;
+    }
+
+    private ServiceOrder persistOrder(ServiceOrderStatus status, LocalDateTime createdAt) {
+        ServiceOrder so = new ServiceOrder();
+        so.setCustomer(customer);
+        so.setVehicle(vehicle);
+        so.setCustomerComplaint("Listagem " + status);
+        so.setStatus(status);
+        so.setCreatedAt(createdAt);
+        return serviceOrderRepository.save(so);
     }
 
     @Test
@@ -230,5 +244,58 @@ class ServiceOrderIntegrationTest extends BaseIntegrationTest {
         assertThat(result.status()).isEqualTo(ServiceOrderStatus.COMPLETED);
         ServiceOrder finalSo = serviceOrderRepository.findByUuid(created.uuid()).orElseThrow();
         assertThat(finalSo.getStatus()).isEqualTo(ServiceOrderStatus.COMPLETED);
+    }
+
+    @Test
+    void listServiceOrders_ordersByStatusPriorityAndExcludesCompletedAndDelivered() {
+        LocalDateTime base = LocalDateTime.now().minusDays(10);
+        ServiceOrder receivedOlder = persistOrder(ServiceOrderStatus.RECEIVED, base);
+        ServiceOrder receivedNewer = persistOrder(ServiceOrderStatus.RECEIVED, base.plusDays(1));
+        ServiceOrder cancelled = persistOrder(ServiceOrderStatus.CANCELLED, base.plusDays(2));
+        ServiceOrder inDiagnosis = persistOrder(ServiceOrderStatus.IN_DIAGNOSIS, base.plusDays(3));
+        ServiceOrder awaitingApproval = persistOrder(ServiceOrderStatus.AWAITING_APPROVAL, base.plusDays(4));
+        ServiceOrder inProgress = persistOrder(ServiceOrderStatus.IN_PROGRESS, base.plusDays(5));
+        ServiceOrder completed = persistOrder(ServiceOrderStatus.COMPLETED, base.plusDays(6));
+        ServiceOrder delivered = persistOrder(ServiceOrderStatus.DELIVERED, base.plusDays(7));
+
+        var page = serviceOrderService.listServiceOrders(
+                null, null, null, null, PageRequest.of(0, 20));
+
+        assertThat(page.getContent()).extracting(ServiceOrderResponse::uuid)
+                .containsExactly(inProgress.getUuid(), awaitingApproval.getUuid(), inDiagnosis.getUuid(),
+                        receivedOlder.getUuid(), receivedNewer.getUuid(), cancelled.getUuid())
+                .doesNotContain(completed.getUuid(), delivered.getUuid());
+        assertThat(page.getTotalElements()).isEqualTo(6);
+    }
+
+    @Test
+    void listServiceOrders_keepsBusinessPriorityWhenClientRequestsDescendingSort() {
+        LocalDateTime base = LocalDateTime.now().minusDays(10);
+        ServiceOrder receivedOlder = persistOrder(ServiceOrderStatus.RECEIVED, base);
+        ServiceOrder receivedNewer = persistOrder(ServiceOrderStatus.RECEIVED, base.plusDays(1));
+        ServiceOrder inProgress = persistOrder(ServiceOrderStatus.IN_PROGRESS, base.plusDays(2));
+
+        var page = serviceOrderService.listServiceOrders(null, null, null, null,
+                PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt")));
+
+        assertThat(page.getContent()).extracting(ServiceOrderResponse::uuid)
+                .containsExactly(inProgress.getUuid(), receivedOlder.getUuid(), receivedNewer.getUuid());
+    }
+
+    @Test
+    void listServiceOrders_withExplicitCompletedFilter_returnsOnlyCompletedOrders() {
+        LocalDateTime base = LocalDateTime.now().minusDays(10);
+        ServiceOrder completedOlder = persistOrder(ServiceOrderStatus.COMPLETED, base);
+        ServiceOrder completedNewer = persistOrder(ServiceOrderStatus.COMPLETED, base.plusDays(1));
+        persistOrder(ServiceOrderStatus.DELIVERED, base.plusDays(2));
+        persistOrder(ServiceOrderStatus.IN_PROGRESS, base.plusDays(3));
+
+        var page = serviceOrderService.listServiceOrders(
+                ServiceOrderStatus.COMPLETED, null, null, null, PageRequest.of(0, 20));
+
+        assertThat(page.getContent()).extracting(ServiceOrderResponse::uuid)
+                .containsExactly(completedOlder.getUuid(), completedNewer.getUuid());
+        assertThat(page.getContent()).extracting(ServiceOrderResponse::status)
+                .containsOnly(ServiceOrderStatus.COMPLETED);
     }
 }
