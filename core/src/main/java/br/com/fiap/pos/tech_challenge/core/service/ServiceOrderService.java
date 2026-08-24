@@ -1,5 +1,6 @@
 package br.com.fiap.pos.tech_challenge.core.service;
 
+import br.com.fiap.pos.tech_challenge.core.controller.dto.OpenProductItemRequest;
 import br.com.fiap.pos.tech_challenge.core.controller.dto.ServiceOrderResponse;
 import br.com.fiap.pos.tech_challenge.core.controller.dto.ServiceOrderStatusResponse;
 import br.com.fiap.pos.tech_challenge.core.domain.*;
@@ -67,6 +68,14 @@ public class ServiceOrderService {
     @Transactional
     public ServiceOrderResponse openServiceOrder(UUID customerUuid, UUID vehicleUuid,
                                                   String customerComplaint) {
+        return openServiceOrder(customerUuid, vehicleUuid, customerComplaint, null, null);
+    }
+
+    @Transactional
+    public ServiceOrderResponse openServiceOrder(UUID customerUuid, UUID vehicleUuid,
+                                                  String customerComplaint,
+                                                  List<UUID> mechanicalServiceUuids,
+                                                  List<OpenProductItemRequest> products) {
         Customer customer = customerService.findEntityByUuid(customerUuid);
         Vehicle vehicle = vehicleService.findEntityByUuid(vehicleUuid);
 
@@ -74,12 +83,17 @@ public class ServiceOrderService {
             throw new CoreException(EApplicationError.VEHICLE_NOT_OWNED_BY_CUSTOMER);
         }
 
+        List<MechanicalService> services = resolveMechanicalServices(mechanicalServiceUuids);
+        List<OpeningProductItem> productItems = resolveProducts(products);
+
         ServiceOrder so = new ServiceOrder();
         so.setCustomerComplaint(customerComplaint);
         so.setCustomer(customer);
         so.setVehicle(vehicle);
 
-        return buildResponse(persistStatusChange(so, ServiceOrderStatus.RECEIVED));
+        ServiceOrder saved = persistStatusChange(so, ServiceOrderStatus.RECEIVED);
+        attachOpeningItems(saved, services, productItems);
+        return buildResponse(saved);
     }
 
     @Transactional
@@ -101,13 +115,7 @@ public class ServiceOrderService {
 
         Quote quote = getOrCreateProvisionalQuote(so);
 
-        QuoteServiceLine line = new QuoteServiceLine();
-        line.setQuote(quote);
-        line.setMechanicalService(ms);
-        line.setNameSnapshot(ms.getName());
-        line.setPriceSnapshot(ms.getBasePrice());
-        line.setEstimatedDurationMinutes(ms.getEstimatedDurationMinutes());
-        quote.getServiceLines().add(line);
+        quote.getServiceLines().add(buildServiceLine(quote, ms));
         quote.setTotalAmount(calculateTotal(quote));
         quoteRepository.save(quote);
         return buildResponse(so);
@@ -153,15 +161,7 @@ public class ServiceOrderService {
 
         Quote quote = getOrCreateProvisionalQuote(so);
 
-        QuoteProductLine line = new QuoteProductLine();
-        line.setQuote(quote);
-        line.setProduct(product);
-        line.setNameSnapshot(product.getName());
-        line.setUnitPriceSnapshot(product.getUnitPrice());
-        line.setQuantity(quantity);
-        line.setMeasurementUnit(product.getMeasurementUnit());
-        line.setUnbudgeted(false);
-        quote.getProductLines().add(line);
+        quote.getProductLines().add(buildProductLine(quote, product, quantity));
         quote.setTotalAmount(calculateTotal(quote));
         quoteRepository.save(quote);
         return buildResponse(so);
@@ -508,6 +508,58 @@ public class ServiceOrderService {
         return saved;
     }
 
+    private List<MechanicalService> resolveMechanicalServices(List<UUID> mechanicalServiceUuids) {
+        if (mechanicalServiceUuids == null) return List.of();
+        return mechanicalServiceUuids.stream()
+                .map(uuid -> mechanicalServiceRepository.findByUuid(uuid)
+                        .orElseThrow(MechanicalServiceNotFoundException::new))
+                .toList();
+    }
+
+    private List<OpeningProductItem> resolveProducts(List<OpenProductItemRequest> products) {
+        if (products == null) return List.of();
+        return products.stream()
+                .map(item -> new OpeningProductItem(
+                        productRepository.findByUuid(item.productUuid())
+                                .orElseThrow(ProductNotFoundException::new),
+                        item.quantity()))
+                .toList();
+    }
+
+    private void attachOpeningItems(ServiceOrder so, List<MechanicalService> services,
+                                     List<OpeningProductItem> productItems) {
+        if (services.isEmpty() && productItems.isEmpty()) return;
+
+        Quote quote = getOrCreateProvisionalQuote(so);
+        services.forEach(ms -> quote.getServiceLines().add(buildServiceLine(quote, ms)));
+        productItems.forEach(item -> quote.getProductLines()
+                .add(buildProductLine(quote, item.product(), item.quantity())));
+        quote.setTotalAmount(calculateTotal(quote));
+        quoteRepository.save(quote);
+    }
+
+    private QuoteServiceLine buildServiceLine(Quote quote, MechanicalService ms) {
+        QuoteServiceLine line = new QuoteServiceLine();
+        line.setQuote(quote);
+        line.setMechanicalService(ms);
+        line.setNameSnapshot(ms.getName());
+        line.setPriceSnapshot(ms.getBasePrice());
+        line.setEstimatedDurationMinutes(ms.getEstimatedDurationMinutes());
+        return line;
+    }
+
+    private QuoteProductLine buildProductLine(Quote quote, Product product, BigDecimal quantity) {
+        QuoteProductLine line = new QuoteProductLine();
+        line.setQuote(quote);
+        line.setProduct(product);
+        line.setNameSnapshot(product.getName());
+        line.setUnitPriceSnapshot(product.getUnitPrice());
+        line.setQuantity(quantity);
+        line.setMeasurementUnit(product.getMeasurementUnit());
+        line.setUnbudgeted(false);
+        return line;
+    }
+
     private Quote getOrCreateProvisionalQuote(ServiceOrder so) {
         return quoteRepository.findFirstByServiceOrderIdOrderByCreatedAtDesc(so.getId())
                 .orElseGet(() -> {
@@ -545,5 +597,8 @@ public class ServiceOrderService {
                         base.uuid(), base.status(), base.customerComplaint(),
                         mapper.toQuoteResponse(q), base.createdAt()))
                 .orElse(base);
+    }
+
+    private record OpeningProductItem(Product product, BigDecimal quantity) {
     }
 }
