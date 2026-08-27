@@ -19,7 +19,9 @@ ARG PROJECT
 
 ARG DEPENDENCY=/workspace/app/${PROJECT}/build/dependency
 
-RUN addgroup -S nonroot && adduser -S nonroot -G nonroot && apk upgrade --no-cache p11-kit p11-kit-trust
+RUN addgroup -S -g 10001 nonroot \
+    && adduser -S -D -H -u 10001 -G nonroot nonroot \
+    && apk upgrade --no-cache p11-kit p11-kit-trust
 
 COPY --from=build ${DEPENDENCY}/BOOT-INF/lib /app/lib
 
@@ -29,6 +31,6 @@ COPY --from=build ${DEPENDENCY}/BOOT-INF/classes /app
 
 EXPOSE 8080
 
-USER nonroot
+USER 10001:10001
 
 ENTRYPOINT ["java","-cp","app:app/lib/*","br.com.fiap.pos.tech_challenge.core.TechChallengeApplication"]
