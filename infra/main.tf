@@ -68,7 +68,7 @@ resource "kubernetes_stateful_set" "postgres" {
 
           volume_mount {
             name       = "postgres-data"
-            mount_path = "/var/lib/postgresql/data"
+            mount_path = "/var/lib/postgresql"
           }
 
           readiness_probe {
