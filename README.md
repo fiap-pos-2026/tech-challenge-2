@@ -32,7 +32,8 @@ o modelo arquitetural:
 - Deploy em **microk8s** local via **Kustomize**, com HPA, ConfigMaps e Secrets
 - Infraestrutura de apoio (namespace, PostgreSQL, Redis e Mailpit) provisionada via
   **Terraform**
-- **Pipeline CI/CD** (GitHub Actions, runner self-hosted) rodando build, testes, imagem e deploy
+- **Pipeline CI/CD** (GitHub Actions, runners GitHub-hosted e self-hosted) rodando build, testes,
+  publicação da imagem e deploy
 
 ---
 
@@ -105,7 +106,7 @@ registrada em log e **não** reverte a transição já persistida.
 | Cobertura | JaCoCo (gate ≥ 80% nos domínios críticos) |
 | Orquestração (Fase 2) | Kubernetes (microk8s) via Kustomize |
 | IaC (Fase 2) | Terraform |
-| CI/CD (Fase 2) | GitHub Actions (runner self-hosted) |
+| CI/CD (Fase 2) | GitHub Actions (runners GitHub-hosted e self-hosted) |
 
 ### Arquitetura
 
@@ -139,7 +140,9 @@ flowchart LR
   Core --> Redis
   Core --> Mailpit
   HPA[HPA CPU/memória] --> Core
-  GA[GitHub Actions] --> Runner[Runner self-hosted WSL2]
+  GA[GitHub Actions] --> Hosted[Runner GitHub-hosted]
+  Hosted --> Build[Build + testes + push GHCR]
+  GA --> Runner[Runner self-hosted WSL2]
   Runner --> TF
   Runner --> K
 ```
@@ -155,7 +158,7 @@ fora do Git, porque contém a senha do banco, as credenciais SMTP e as chaves JW
 - **Docker** e **Docker Compose** (recomendado para execução local)
 - **JDK 25** e **Gradle** (para execução local sem Docker)
 - **microk8s** no WSL2 com `kubectl` e Kustomize — para deploy em Kubernetes
-- Addons microk8s `dns`, `storage`, `registry` e `metrics-server`
+- Addons microk8s `dns`, `storage` e `metrics-server`
 - **Terraform** ≥ 1.6 — para provisionar recursos via `/infra`
 - Repositório GitHub com Actions habilitado — para validar o CI/CD
 
@@ -202,13 +205,13 @@ Swagger UI disponível em: `http://localhost:8080/core/swagger-ui.html`
 ### Kubernetes local (microk8s + Kustomize)
 
 Manifests em `/k8s`, organizados em `base` (Deployment, Service, ConfigMap, Secret de exemplo, HPA) e
-overlay `local` (imagem do registry embutido do microk8s, NodePort, requests reduzidos para o nó
-único do WSL2):
+overlay `local` (imagem do GHCR, NodePort, requests reduzidos para o nó único do WSL2). A imagem
+`ghcr.io/fiap-pos-2026/tech-challenge-core` é pública e é publicada pelo workflow de CI/CD:
 
 ```bash
 # 1. Verifique o cluster e habilite os addons necessários
 microk8s status --wait-ready
-microk8s enable dns storage registry metrics-server
+microk8s enable dns storage metrics-server
 microk8s kubectl get nodes
 
 # 2. Provisione namespace, PostgreSQL, Redis e Mailpit
@@ -229,14 +232,13 @@ kubectl -n tech-challenge create secret generic tech-challenge-core-secret \
   --from-file=jwt-public-key=core/src/main/resources/certs/dev-public.pem \
   --from-file=jwt-private-key=core/src/main/resources/certs/dev-private.pem
 
-# 4. Publique a imagem no registry local
-docker build -f core/Dockerfile \
-  -t localhost:32000/tech-challenge-core:local .
-docker push localhost:32000/tech-challenge-core:local
-
-# 5. Revise e aplique o overlay Kustomize
+# 4. Revise e aplique o overlay Kustomize
 kubectl kustomize k8s/overlays/local
 kubectl apply -k k8s/overlays/local
+
+# 5. Em uma execução manual, fixe a tag publicada desejada
+kubectl -n tech-challenge set image deployment/core \
+  core=ghcr.io/fiap-pos-2026/tech-challenge-core:latest
 ```
 
 A aplicação responde em `http://<ip-do-node>:30080/core`. Para descobrir o IP do
@@ -277,9 +279,10 @@ Passo a passo completo, variáveis, Secret da aplicação e outputs estão em
 
 ### CI/CD
 
-O workflow [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml) roda em um runner
-**self-hosted** no WSL2 com acesso ao Docker, Terraform e microk8s. O runner precisa das
-labels `self-hosted`, `wsl2` e `microk8s`.
+O workflow [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml) usa runners GitHub-hosted
+para build, testes e publicação da imagem no GHCR. Os jobs de Terraform e deploy usam um runner
+**self-hosted** no WSL2 com acesso ao microk8s. O runner local não precisa acessar o Docker Hub nem
+o registry local do microk8s.
 
 #### Configurar o runner
 
@@ -292,7 +295,6 @@ labels `self-hosted`, `wsl2` e `microk8s`.
 O usuário do runner precisa executar os seguintes comandos sem intervenção de senha:
 
 ```bash
-docker version
 terraform version
 kubectl get nodes
 ```
@@ -301,21 +303,29 @@ Crie também o Secret do repositório **`TF_VAR_DB_PASSWORD`** em
 **Settings → Secrets and variables → Actions**. O valor precisa ser igual à senha
 usada pelo PostgreSQL.
 
+O workflow usa o `GITHUB_TOKEN` para publicar no GHCR. Em **Settings → Actions → General**,
+confirme que o repositório permite que workflows criem e publiquem pacotes. No pacote
+`tech-challenge-core`, configure a visibilidade como **Public** para que o microk8s faça o pull
+sem `imagePullSecret`.
+
 #### Gatilhos do workflow
 
 | Gatilho | Estágios executados |
 |---|---|
 | Push em `main` ou `feature/tech-challenge-2` | Build, testes, imagem, Terraform e deploy |
 | Pull Request para `main` | Build e testes |
-| `workflow_dispatch` | Build e testes |
+| `workflow_dispatch` | Build, testes, imagem, Terraform e deploy |
 
-O deploy só ocorre em `push`. A cadeia completa é:
+Nos eventos de `push` e `workflow_dispatch`, a cadeia completa é:
 
 ```text
 build-and-test → docker-image → terraform-apply → deploy
 ```
 
-Qualquer falha em build, testes, imagem ou Terraform bloqueia os estágios seguintes.
+O job `docker-image` publica as tags `latest` e o SHA do commit em
+`ghcr.io/fiap-pos-2026/tech-challenge-core`. O deploy fixa o Deployment na tag SHA, garantindo
+que o cluster execute a mesma imagem validada no job de build. Qualquer falha em build, testes,
+imagem ou Terraform bloqueia os estágios seguintes.
 
 ---
 

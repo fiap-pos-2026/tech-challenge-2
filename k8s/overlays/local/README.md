@@ -1,28 +1,26 @@
 # Overlay `local` (microk8s / WSL2)
 
-Aplica a base do `/k8s` no cluster microk8s local, com a imagem publicada no registry embutido do
-microk8s e o Service exposto via NodePort.
+Aplica a base do `/k8s` no cluster microk8s local, com a imagem publicada no GitHub Container
+Registry (GHCR) e o Service exposto via NodePort.
 
 ## Imagem
 
 | Item | Valor |
 | ---- | ----- |
-| Registry | `localhost:32000` (addon `registry` do microk8s) |
-| Imagem | `localhost:32000/tech-challenge-core` |
-| Tag | `local` |
+| Registry | `ghcr.io` |
+| Imagem | `ghcr.io/fiap-pos-2026/tech-challenge-core` |
+| Tag do CI/CD | SHA do commit |
+| Tag manual | `latest` |
 
-```bash
-microk8s enable registry            # habilita o registry em localhost:32000
-docker build -f core/Dockerfile -t localhost:32000/tech-challenge-core:local .
-docker push localhost:32000/tech-challenge-core:local
-```
+O pacote `fiap-pos-2026/tech-challenge-core` precisa estar público no GHCR. O workflow de CI/CD
+publica automaticamente uma tag imutável com o SHA do commit e atualiza a tag `latest`.
 
 ## Pré-requisitos no cluster
 
 1. Namespace `tech-challenge` e as dependências (PostgreSQL, Redis e Mailpit)
    provisionados pelo Terraform — ver `/infra`.
 2. Secret `tech-challenge-core-secret` criado fora do Git.
-3. Addons `dns`, `storage`, `metrics-server` e `registry` habilitados.
+3. Addons `dns`, `storage` e `metrics-server` habilitados.
 
 Depois do `terraform apply`, crie o Secret da aplicação a partir da raiz do
 repositório:
@@ -42,8 +40,15 @@ kubectl -n tech-challenge create secret generic tech-challenge-core-secret \
 ```bash
 kubectl kustomize k8s/overlays/local     # revisa o resultado
 kubectl apply -k k8s/overlays/local
+# Para uma execução manual, use a tag publicada desejada.
+kubectl -n tech-challenge set image deployment/core \
+  core=ghcr.io/fiap-pos-2026/tech-challenge-core:latest
 kubectl -n tech-challenge rollout status deployment/core --timeout=180s
 ```
+
+No workflow, a tag `latest` aplicada pelo overlay é substituída pela tag SHA do commit antes da
+validação do rollout. Isso garante que o cluster execute exatamente a imagem validada e publicada
+pela pipeline.
 
 A aplicação responde em `http://<ip-do-node>:30080/core` (health em `/core/actuator/health`).
 

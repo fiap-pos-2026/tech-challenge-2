@@ -4,11 +4,12 @@ kind: Kustomization
 resources:
   - ../../base
 
-# Registry embutido do microk8s (`microk8s enable registry`) — publique a imagem antes do apply
+# Imagem publicada pelo workflow no GitHub Container Registry.
+# O pacote deve permanecer público para o microk8s baixar a imagem sem Secret.
 images:
   - name: tech-challenge-core
-    newName: localhost:32000/tech-challenge-core
-    newTag: local
+    newName: ghcr.io/fiap-pos-2026/tech-challenge-core
+    newTag: latest
 
 patches:
   - path: patch-service-nodeport.yaml

@@ -14,21 +14,25 @@ concurrency:
   group: ci-cd-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  packages: write
+
 env:
-  IMAGE_NAME: localhost:32000/tech-challenge-core
+  IMAGE_NAME: ghcr.io/fiap-pos-2026/tech-challenge-core
 
 jobs:
-  # Build + testes automatizados. Roda em qualquer push/PR; falha aqui bloqueia
-  # os estágios seguintes (imagem, Terraform, deploy) via `needs`.
+  # Build + testes automatizados em runner GitHub-hosted. Falha aqui bloqueia os
+  # estágios seguintes via `needs`.
   build-and-test:
     name: Build & Test
-    runs-on: [self-hosted, wsl2, microk8s]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "25"
@@ -51,31 +55,43 @@ jobs:
           path: core/build/reports/tests/test
           retention-days: 7
 
-  # Constrói e publica a imagem Docker no registry local do microk8s.
-  # Só roda em push (não em PR de fora do repositório).
+  # Constrói e publica a imagem Docker no GitHub Container Registry.
+  # Roda apenas em push ou execução manual, nunca em pull request.
   docker-image:
     name: Build & Push Docker Image
     needs: build-and-test
-    if: github.event_name == 'push'
-    runs-on: [self-hosted, wsl2, microk8s]
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build image
-        run: docker build -f core/Dockerfile -t ${{ env.IMAGE_NAME }}:${{ github.sha }} -t ${{ env.IMAGE_NAME }}:local .
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push image to microk8s registry
+      - name: Build image
+        run: |
+          docker build \
+            -f core/Dockerfile \
+            -t ${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            -t ${{ env.IMAGE_NAME }}:latest \
+            .
+
+      - name: Push image to GHCR
         run: |
           docker push ${{ env.IMAGE_NAME }}:${{ github.sha }}
-          docker push ${{ env.IMAGE_NAME }}:local
+          docker push ${{ env.IMAGE_NAME }}:latest
 
-  # Provisiona/atualiza namespace, PostgreSQL e Redis via Terraform sobre o cluster
-  # microk8s já existente (infra/ — ver infra/README.md). Não instala o cluster.
+  # Provisiona/atualiza namespace, PostgreSQL, Redis e Mailpit via Terraform
+  # sobre o cluster microk8s já existente. Não instala o cluster.
   terraform-apply:
     name: Terraform Apply (infra)
     needs: docker-image
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: [self-hosted, wsl2, microk8s]
     defaults:
       run:
@@ -95,19 +111,25 @@ jobs:
       - name: Terraform Apply
         run: terraform apply -auto-approve -input=false
 
-  # Aplica os manifests Kustomize da app no microk8s. Falha em qualquer estágio
-  # anterior (build, testes, imagem, Terraform) impede que este job execute.
+  # Aplica os manifests Kustomize da app no microk8s usando a tag SHA publicada.
+  # Falha em qualquer estágio anterior impede que este job execute.
   deploy:
     name: Deploy (kubectl apply -k)
     needs: terraform-apply
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: [self-hosted, wsl2, microk8s]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Apply Kustomize overlay local
-        run: kubectl apply -k k8s/overlays/local
+      - name: Render and apply Kustomize overlay
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="${IMAGE_NAME}:${GITHUB_SHA}"
+          kubectl kustomize k8s/overlays/local \
+            | sed "s|${IMAGE_NAME}:latest|${image}|g" \
+            | kubectl apply -f -
 
       - name: Wait for rollout
         run: kubectl -n tech-challenge rollout status deployment/core --timeout=180s
