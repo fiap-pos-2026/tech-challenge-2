@@ -30,7 +30,8 @@ o modelo arquitetural:
 - Listagem priorizada de OS (ordem de negócio + exclusão de Finalizada/Entregue por padrão)
 - Notificação do cliente por e-mail a cada mudança de status da OS
 - Deploy em **microk8s** local via **Kustomize**, com HPA, ConfigMaps e Secrets
-- Infraestrutura de apoio (namespace, PostgreSQL, Redis) provisionada via **Terraform**
+- Infraestrutura de apoio (namespace, PostgreSQL, Redis e Mailpit) provisionada via
+  **Terraform**
 - **Pipeline CI/CD** (GitHub Actions, runner self-hosted) rodando build, testes, imagem e deploy
 
 ---
@@ -125,14 +126,38 @@ A Fase 2 manteve deliberadamente a Clean Architecture já adotada na Fase 1 — 
 para Hexagonal/ports-and-adapters**; os gaps de API e a fatia de plataforma (Kustomize, Terraform,
 CI/CD) foram entregues sobre o layout existente.
 
+### Arquitetura da infraestrutura
+
+```mermaid
+flowchart LR
+  TF[Terraform] --> NS[Namespace tech-challenge]
+  NS --> PG[(PostgreSQL)]
+  NS --> Redis[(Redis)]
+  NS --> Mailpit[Mailpit SMTP]
+  K[Kustomize] --> Core[Deployment core]
+  Core --> PG
+  Core --> Redis
+  Core --> Mailpit
+  HPA[HPA CPU/memória] --> Core
+  GA[GitHub Actions] --> Runner[Runner self-hosted WSL2]
+  Runner --> TF
+  Runner --> K
+```
+
+O Terraform provisiona as dependências de execução no microk8s existente. O Kustomize
+provisiona a aplicação, o Service, o ConfigMap e o HPA. O Secret da aplicação é criado
+fora do Git, porque contém a senha do banco, as credenciais SMTP e as chaves JWT.
+
 ---
 
 ## Pré-requisitos
 
 - **Docker** e **Docker Compose** (recomendado para execução local)
-- **JDK 25+** e **Gradle** (para execução local sem Docker)
-- **microk8s** (WSL2) + `kubectl` com plugin Kustomize — para deploy em Kubernetes
-- **Terraform** ≥ 1.6 — para provisionar namespace/PostgreSQL/Redis via `/infra`
+- **JDK 25** e **Gradle** (para execução local sem Docker)
+- **microk8s** no WSL2 com `kubectl` e Kustomize — para deploy em Kubernetes
+- Addons microk8s `dns`, `storage`, `registry` e `metrics-server`
+- **Terraform** ≥ 1.6 — para provisionar recursos via `/infra`
+- Repositório GitHub com Actions habilitado — para validar o CI/CD
 
 ---
 
@@ -181,27 +206,63 @@ overlay `local` (imagem do registry embutido do microk8s, NodePort, requests red
 único do WSL2):
 
 ```bash
-# 1. Publique a imagem no registry do microk8s (ver k8s/overlays/local/README.md)
-microk8s enable registry
-docker build -f core/Dockerfile -t localhost:32000/tech-challenge-core:local .
+# 1. Verifique o cluster e habilite os addons necessários
+microk8s status --wait-ready
+microk8s enable dns storage registry metrics-server
+microk8s kubectl get nodes
+
+# 2. Provisione namespace, PostgreSQL, Redis e Mailpit
+cd infra
+cp terraform.tfvars.example terraform.tfvars
+# Edite terraform.tfvars e informe db_password
+terraform init
+terraform plan -var-file=terraform.tfvars
+terraform apply -var-file=terraform.tfvars
+cd ..
+
+# 3. Crie o Secret real da aplicação fora do Git
+kubectl -n tech-challenge create secret generic tech-challenge-core-secret \
+  --from-literal=jdbc-username=techdev \
+  --from-literal=jdbc-password='<mesma senha do Terraform>' \
+  --from-literal=mail-username=noreply@tech.local \
+  --from-literal=mail-password='' \
+  --from-file=jwt-public-key=core/src/main/resources/certs/dev-public.pem \
+  --from-file=jwt-private-key=core/src/main/resources/certs/dev-private.pem
+
+# 4. Publique a imagem no registry local
+docker build -f core/Dockerfile \
+  -t localhost:32000/tech-challenge-core:local .
 docker push localhost:32000/tech-challenge-core:local
 
-# 2. Provisione namespace + PostgreSQL + Redis (ver seção Terraform abaixo)
-
-# 3. Crie o Secret real (fora do git) — ver k8s/base/secret.example.yaml
-
-# 4. Aplique o Kustomize
-kubectl kustomize k8s/overlays/local     # revisa o resultado
+# 5. Revise e aplique o overlay Kustomize
+kubectl kustomize k8s/overlays/local
 kubectl apply -k k8s/overlays/local
 ```
 
-A aplicação responde em `http://<ip-do-node>:30080/core`. Detalhes completos em
+A aplicação responde em `http://<ip-do-node>:30080/core`. Para descobrir o IP do
+node, execute `hostname -I` no WSL2. Detalhes completos estão em
 [`k8s/overlays/local/README.md`](k8s/overlays/local/README.md).
+
+Para acompanhar o deploy:
+
+```bash
+kubectl -n tech-challenge get pods,services,hpa
+kubectl -n tech-challenge rollout status deployment/core --timeout=180s
+curl http://<ip-do-node>:30080/core/actuator/health
+```
+
+Para visualizar os e-mails capturados pelo Mailpit:
+
+```bash
+kubectl -n tech-challenge port-forward service/mailpit 8025:8025
+```
+
+Acesse `http://localhost:8025`.
 
 ### Terraform (infraestrutura de apoio)
 
-O diretório `/infra` provisiona, via Terraform, o namespace e as dependências de dados
-(PostgreSQL, Redis) **sobre um microk8s já instalado** — o Terraform não instala o cluster:
+O diretório `/infra` provisiona, via Terraform, o namespace, PostgreSQL, Redis e
+Mailpit **sobre um microk8s já instalado**. O Terraform não instala o cluster:
 
 ```bash
 cd infra
@@ -211,14 +272,50 @@ terraform plan -var-file=terraform.tfvars
 terraform apply -var-file=terraform.tfvars
 ```
 
-Passo a passo completo, variáveis e outputs em [`infra/README.md`](infra/README.md).
+Passo a passo completo, variáveis, Secret da aplicação e outputs estão em
+[`infra/README.md`](infra/README.md).
 
 ### CI/CD
 
-O workflow [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml) roda em runner
-**self-hosted** (WSL2 com acesso ao microk8s) e encadeia: build → testes → imagem Docker →
-`terraform apply` → `kubectl apply -k k8s/overlays/local`. Falha em build ou testes interrompe a
-cadeia e bloqueia o deploy.
+O workflow [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml) roda em um runner
+**self-hosted** no WSL2 com acesso ao Docker, Terraform e microk8s. O runner precisa das
+labels `self-hosted`, `wsl2` e `microk8s`.
+
+#### Configurar o runner
+
+1. No GitHub, abra **Settings → Actions → Runners → New self-hosted runner**.
+2. Selecione **Linux** e **x64**.
+3. No WSL2, execute os comandos de instalação exibidos pelo GitHub.
+4. Configure o runner com as labels `wsl2,microk8s`.
+5. Inicie-o com `./run.sh` e confirme que aparece como **Idle** no GitHub.
+
+O usuário do runner precisa executar os seguintes comandos sem intervenção de senha:
+
+```bash
+docker version
+terraform version
+kubectl get nodes
+```
+
+Crie também o Secret do repositório **`TF_VAR_DB_PASSWORD`** em
+**Settings → Secrets and variables → Actions**. O valor precisa ser igual à senha
+usada pelo PostgreSQL.
+
+#### Gatilhos do workflow
+
+| Gatilho | Estágios executados |
+|---|---|
+| Push em `main` ou `feature/tech-challenge-2` | Build, testes, imagem, Terraform e deploy |
+| Pull Request para `main` | Build e testes |
+| `workflow_dispatch` | Build e testes |
+
+O deploy só ocorre em `push`. A cadeia completa é:
+
+```text
+build-and-test → docker-image → terraform-apply → deploy
+```
+
+Qualquer falha em build, testes, imagem ou Terraform bloqueia os estágios seguintes.
 
 ---
 

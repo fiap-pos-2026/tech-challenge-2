@@ -13,24 +13,18 @@ esse cluster.
 | Credenciais do PostgreSQL | `kubernetes_secret` | `postgres-credentials` | `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` |
 | Banco de dados | `kubernetes_stateful_set` + `kubernetes_service` | `postgres` | Imagem `postgres:18.4-alpine` (mesma do `docker-compose.yml`); volume persistente |
 | Cache / rate limiting | `kubernetes_deployment` + `kubernetes_service` | `redis` | Imagem `redis:7-alpine` (mesma do `docker-compose.yml`); sem senha, sem persistência (`--save ""`) |
+| E-mail local | `kubernetes_deployment` + `kubernetes_service` | `mailpit` | Imagem `axllent/mailpit:latest`; SMTP na porta `1025` e interface web na `8025` |
 
-Os nomes dos Services (`postgres`, `redis`) foram escolhidos para casar exatamente com
-`JDBC_HOST` e `REDIS_HOST` já definidos em `k8s/base/configmap.yaml` — nenhuma variável de ambiente
-da aplicação precisa mudar para consumir esta infra.
-
-> **Desvio de design**: os charts Helm `bitnami/postgresql` e `bitnami/redis` foram avaliados, mas os
-> charts Bitnami atuais dependem do registry OCI `registry-1.docker.io/bitnamicharts` e parte das
-> versões mais recentes exige assinatura ("Bitnami Secure Images"). Para não acoplar o `terraform
-> apply` a credenciais externas fora do controle deste desafio, os recursos foram declarados como
-> manifests equivalentes via provider `kubernetes` (mesma opção prevista no design: "Helm ou
-> manifest equivalente"). O provider `helm` (`infra/providers.tf`, T13) permanece disponível para uso
-> futuro caso o time volte a usar charts de terceiros.
+Os nomes dos Services (`postgres`, `redis`, `mailpit`) foram escolhidos para casar exatamente com
+`JDBC_HOST`, `REDIS_HOST` e `MAIL_HOST` já definidos em `k8s/base/configmap.yaml` — nenhuma variável
+de ambiente da aplicação precisa mudar para consumir esta infra.
 
 ## Pré-requisitos
 
 1. **Terraform** ≥ 1.6 instalado.
 2. **microk8s** já instalado e rodando (fora do escopo deste módulo).
-3. **kubeconfig** do microk8s disponível localmente, por exemplo:
+3. Addons `dns`, `storage` e `metrics-server` habilitados no microk8s.
+4. **kubeconfig** do microk8s disponível localmente, por exemplo:
 
    ```bash
    microk8s config > ~/.kube/config
@@ -76,13 +70,24 @@ Após o `apply`, crie o Secret real da aplicação com a **mesma senha** usada e
 kubectl -n tech-challenge create secret generic tech-challenge-core-secret \
   --from-literal=jdbc-username=techdev \
   --from-literal=jdbc-password='<mesma senha de db_password>' \
-  --from-literal=mail-username='' \
+  --from-literal=mail-username=noreply@tech.local \
   --from-literal=mail-password='' \
-  --from-file=jwt-public-key=./public.pem \
-  --from-file=jwt-private-key=./private.pem
+  --from-file=jwt-public-key=../core/src/main/resources/certs/dev-public.pem \
+  --from-file=jwt-private-key=../core/src/main/resources/certs/dev-private.pem
 ```
 
-Em seguida, aplique o Kustomize (`k8s/overlays/local`) — ver `k8s/overlays/local/README.md`.
+As chaves `dev-*` servem apenas para validação local. Não use essas chaves em produção.
+Em seguida, aplique o Kustomize (`k8s/overlays/local`) — ver
+`k8s/overlays/local/README.md`.
+
+O Mailpit não exige autenticação SMTP. O `mail-username` é usado apenas como
+endereço de remetente pela aplicação. Para visualizar as mensagens:
+
+```bash
+kubectl -n tech-challenge port-forward service/mailpit 8025:8025
+```
+
+Acesse `http://localhost:8025`.
 
 ## Outputs
 
@@ -106,4 +111,4 @@ terraform output
 terraform destroy -var-file=terraform.tfvars
 ```
 
-Isso remove namespace, PostgreSQL e Redis do cluster — **não afeta o microk8s em si**.
+Isso remove namespace, PostgreSQL, Redis e Mailpit do cluster — **não afeta o microk8s em si**.

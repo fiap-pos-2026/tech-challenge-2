@@ -206,3 +206,86 @@ resource "kubernetes_service" "redis" {
     type = "ClusterIP"
   }
 }
+
+# Mailpit captura os e-mails de OTP e de mudança de status no ambiente local,
+# mantendo o mesmo serviço usado pelo docker-compose.yml.
+resource "kubernetes_deployment" "mailpit" {
+  metadata {
+    name      = "mailpit"
+    namespace = kubernetes_namespace.tech_challenge.metadata[0].name
+    labels = {
+      "app.kubernetes.io/name" = "mailpit"
+    }
+  }
+
+  spec {
+    replicas = 1
+
+    selector {
+      match_labels = {
+        "app.kubernetes.io/name" = "mailpit"
+      }
+    }
+
+    template {
+      metadata {
+        labels = {
+          "app.kubernetes.io/name" = "mailpit"
+        }
+      }
+
+      spec {
+        container {
+          name  = "mailpit"
+          image = "axllent/mailpit:latest"
+
+          port {
+            name           = "smtp"
+            container_port = 1025
+          }
+
+          port {
+            name           = "web"
+            container_port = 8025
+          }
+
+          readiness_probe {
+            http_get {
+              path = "/"
+              port = "web"
+            }
+            initial_delay_seconds = 5
+            period_seconds        = 10
+          }
+        }
+      }
+    }
+  }
+}
+
+resource "kubernetes_service" "mailpit" {
+  metadata {
+    name      = "mailpit"
+    namespace = kubernetes_namespace.tech_challenge.metadata[0].name
+  }
+
+  spec {
+    selector = {
+      "app.kubernetes.io/name" = "mailpit"
+    }
+
+    port {
+      name        = "smtp"
+      port        = 1025
+      target_port = "smtp"
+    }
+
+    port {
+      name        = "web"
+      port        = 8025
+      target_port = "web"
+    }
+
+    type = "ClusterIP"
+  }
+}
