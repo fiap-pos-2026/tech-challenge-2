@@ -303,6 +303,10 @@ Crie também o Secret do repositório **`TF_VAR_DB_PASSWORD`** em
 **Settings → Secrets and variables → Actions**. O valor precisa ser igual à senha
 usada pelo PostgreSQL.
 
+Antes do primeiro workflow, migre o estado local do Terraform para o backend Kubernetes seguindo
+o procedimento em [`infra/README.md`](infra/README.md#estado-compartilhado-pelo-ci). Sem essa
+migração, o CI não reconhece recursos criados manualmente e tenta recriá-los.
+
 O workflow usa o `GITHUB_TOKEN` para publicar no GHCR. Em **Settings → Actions → General**,
 confirme que o repositório permite que workflows criem e publiquem pacotes. No pacote
 `tech-challenge-core`, configure a visibilidade como **Public** para que o microk8s faça o pull

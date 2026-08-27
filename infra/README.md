@@ -63,6 +63,38 @@ terraform plan -var-file=terraform.tfvars
 terraform apply -var-file=terraform.tfvars
 ```
 
+## Estado compartilhado pelo CI
+
+O estado do Terraform fica no backend Kubernetes, armazenado em um Secret no namespace
+`default`. Assim, o runner self-hosted, o CI e as execuções locais usam o mesmo estado. O
+arquivo `terraform.tfstate` local continua ignorado pelo Git.
+
+Na primeira configuração, migre o estado local existente para o backend. Execute este comando
+uma única vez no ambiente que contém o `infra/terraform.tfstate` atual:
+
+```bash
+cd infra
+terraform init -migrate-state -force-copy
+terraform plan -var-file=terraform.tfvars
+```
+
+Confirme que o plano não tenta adicionar os recursos já existentes antes de executar o `apply`.
+O backend cria um Secret com nome no formato `tfstate-default-tech-challenge`.
+
+Se o estado local não estiver disponível, importe os recursos existentes antes do primeiro
+`apply`:
+
+```bash
+terraform import kubernetes_namespace.tech_challenge tech-challenge
+terraform import kubernetes_secret.postgres tech-challenge/postgres-credentials
+terraform import kubernetes_stateful_set.postgres tech-challenge/postgres
+terraform import kubernetes_service.postgres tech-challenge/postgres
+terraform import kubernetes_deployment.redis tech-challenge/redis
+terraform import kubernetes_service.redis tech-challenge/redis
+terraform import kubernetes_deployment.mailpit tech-challenge/mailpit
+terraform import kubernetes_service.mailpit tech-challenge/mailpit
+```
+
 Após o `apply`, crie o Secret real da aplicação com a **mesma senha** usada em `db_password`
 (ver `k8s/base/secret.example.yaml`):
 
