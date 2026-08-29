@@ -1,8 +1,10 @@
-# Terraform NÃO instala nem provisiona o cluster microk8s — apenas se conecta a um
-# cluster já existente via kubeconfig. Ver `infra/README.md` para o pré-requisito.
+# Quando manage_microk8s = true (default), o kubeconfig referenciado abaixo é gerado pelo
+# próprio Terraform em cluster.tf (`microk8s config > kubeconfig_path`) antes destes providers
+# serem usados. Quando manage_microk8s = false, ele deve apontar para um kubeconfig já existente
+# de um cluster provisionado por outro meio (local ou cloud). Ver `infra/README.md`.
 
 variable "kubeconfig_path" {
-  description = "Caminho do kubeconfig do microk8s (gerado com `microk8s config > ~/.kube/config-microk8s`)."
+  description = "Caminho do kubeconfig do cluster. Com manage_microk8s = true é o destino de `microk8s config`; com manage_microk8s = false, deve apontar para um kubeconfig já existente."
   type        = string
   default     = "~/.kube/config"
 }

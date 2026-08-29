@@ -1,9 +1,13 @@
-# Recursos de apoio (namespace, PostgreSQL, Redis) sobre o microk8s já existente.
-# Sem Helm charts de terceiros: manifests equivalentes via provider kubernetes, usando
-# as mesmas imagens do docker-compose.yml para paridade dev/prd e nomes de Service que
+# Recursos de apoio (namespace, PostgreSQL, Redis, Mailpit) sobre o cluster provisionado em
+# cluster.tf. Sem Helm charts de terceiros: manifests equivalentes via provider kubernetes,
+# usando as mesmas imagens do docker-compose.yml para paridade dev/prd e nomes de Service que
 # casam com JDBC_HOST/REDIS_HOST já esperados por k8s/base/configmap.yaml (`postgres`, `redis`).
 
 resource "kubernetes_namespace" "tech_challenge" {
+  # Garante que o cluster (microk8s instalado/habilitado em cluster.tf, quando
+  # manage_microk8s = true) já existe antes de qualquer recurso kubernetes_* ser aplicado.
+  depends_on = [null_resource.microk8s]
+
   metadata {
     name = var.namespace
   }

@@ -1,3 +1,8 @@
+output "cluster_managed_by_terraform" {
+  description = "Se true, o cluster microk8s foi instalado/habilitado por este módulo (cluster.tf). Se false, o Terraform apenas se conectou a um cluster provisionado por outro meio."
+  value       = var.manage_microk8s
+}
+
 output "namespace" {
   description = "Namespace provisionado no microk8s."
   value       = kubernetes_namespace.tech_challenge.metadata[0].name
