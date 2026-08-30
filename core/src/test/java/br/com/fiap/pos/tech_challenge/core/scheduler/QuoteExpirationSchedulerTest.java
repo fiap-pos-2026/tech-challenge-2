@@ -1,15 +1,19 @@
 package br.com.fiap.pos.tech_challenge.core.scheduler;
 
+import br.com.fiap.pos.tech_challenge.core.domain.Customer;
 import br.com.fiap.pos.tech_challenge.core.domain.ServiceOrder;
 import br.com.fiap.pos.tech_challenge.core.enums.ServiceOrderStatus;
 import br.com.fiap.pos.tech_challenge.core.repository.ServiceOrderRepository;
 import br.com.fiap.pos.tech_challenge.core.service.NotificationService;
 import br.com.fiap.pos.tech_challenge.core.service.OTPService;
+import br.com.fiap.pos.tech_challenge.core.service.event.ServiceOrderStatusChangedEvent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.List;
 import java.util.UUID;
@@ -29,6 +33,7 @@ class QuoteExpirationSchedulerTest {
     @Mock ServiceOrderRepository serviceOrderRepository;
     @Mock OTPService otpService;
     @Mock NotificationService notificationService;
+    @Mock ApplicationEventPublisher eventPublisher;
 
     @InjectMocks QuoteExpirationScheduler sut;
 
@@ -49,6 +54,30 @@ class QuoteExpirationSchedulerTest {
     }
 
     @Test
+    void expireOverdueQuotes_publishesStatusEventForEachCancelledOrder() {
+        ServiceOrder so = serviceOrderWithStatus(ServiceOrderStatus.AWAITING_APPROVAL);
+        Customer customer = new Customer();
+        customer.setEmail("cliente@mail.com");
+        customer.setName("Cliente Teste");
+        so.setCustomer(customer);
+
+        when(serviceOrderRepository.findByStatusAndApprovalExpiresAtBefore(
+                eq(ServiceOrderStatus.AWAITING_APPROVAL), any())).thenReturn(List.of(so));
+
+        sut.expireOverdueQuotes();
+
+        ArgumentCaptor<ServiceOrderStatusChangedEvent> captor =
+                ArgumentCaptor.forClass(ServiceOrderStatusChangedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        ServiceOrderStatusChangedEvent event = captor.getValue();
+        assertThat(event.serviceOrderUuid()).isEqualTo(so.getUuid());
+        assertThat(event.previousStatus()).isEqualTo(ServiceOrderStatus.AWAITING_APPROVAL);
+        assertThat(event.newStatus()).isEqualTo(ServiceOrderStatus.CANCELLED);
+        assertThat(event.customerEmail()).isEqualTo("cliente@mail.com");
+        assertThat(event.customerName()).isEqualTo("Cliente Teste");
+    }
+
+    @Test
     void expireOverdueQuotes_doesNothingWhenNoneExpired() {
         when(serviceOrderRepository.findByStatusAndApprovalExpiresAtBefore(any(), any()))
                 .thenReturn(List.of());
@@ -57,6 +86,7 @@ class QuoteExpirationSchedulerTest {
 
         verify(otpService, never()).invalidateByServiceOrder(any());
         verify(notificationService, never()).publishToRole(any(), any(), any(), any());
+        verify(eventPublisher, never()).publishEvent(any(ServiceOrderStatusChangedEvent.class));
         verify(serviceOrderRepository).saveAll(List.of());
     }
 

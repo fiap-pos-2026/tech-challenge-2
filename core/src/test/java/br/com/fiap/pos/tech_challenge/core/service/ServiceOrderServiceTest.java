@@ -1,5 +1,6 @@
 package br.com.fiap.pos.tech_challenge.core.service;
 
+import br.com.fiap.pos.tech_challenge.core.controller.dto.OpenProductItemRequest;
 import br.com.fiap.pos.tech_challenge.core.controller.dto.ServiceOrderResponse;
 import br.com.fiap.pos.tech_challenge.core.domain.*;
 import br.com.fiap.pos.tech_challenge.core.enums.ServiceOrderStatus;
@@ -7,14 +8,19 @@ import br.com.fiap.pos.tech_challenge.core.exception.*;
 import br.com.fiap.pos.tech_challenge.core.mapper.ServiceOrderMapper;
 import br.com.fiap.pos.tech_challenge.core.repository.*;
 import br.com.fiap.pos.tech_challenge.core.security.UserDetailsImpl;
+import br.com.fiap.pos.tech_challenge.core.service.event.ServiceOrderStatusChangedEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -50,6 +56,7 @@ class ServiceOrderServiceTest {
     @Mock AuthenticationService authenticationService;
     @Mock UserRepository userRepository;
     @Mock ServiceOrderMapper mapper;
+    @Mock ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     ServiceOrderService sut;
@@ -87,6 +94,163 @@ class ServiceOrderServiceTest {
         assertThat(result.status()).isEqualTo(ServiceOrderStatus.RECEIVED);
     }
 
+    @Test
+    void openServiceOrder_withoutItems_returnsOrderUuidAndSkipsQuote() {
+        UUID customerUuid = UUID.randomUUID();
+        UUID vehicleUuid = UUID.randomUUID();
+        UUID osUuid = UUID.randomUUID();
+
+        Customer customer = new Customer();
+        customer.setId(1L);
+
+        Vehicle vehicle = new Vehicle();
+        vehicle.setCustomer(customer);
+
+        ServiceOrder saved = serviceOrderWithStatus(ServiceOrderStatus.RECEIVED);
+        saved.setUuid(osUuid);
+
+        when(customerService.findEntityByUuid(customerUuid)).thenReturn(customer);
+        when(vehicleService.findEntityByUuid(vehicleUuid)).thenReturn(vehicle);
+        when(serviceOrderRepository.save(any())).thenReturn(saved);
+        when(mapper.toResponse(saved)).thenReturn(new ServiceOrderResponse(
+                osUuid, ServiceOrderStatus.RECEIVED, "Barulho no motor", null, LocalDateTime.now()));
+        when(quoteRepository.findFirstByServiceOrderIdOrderByCreatedAtDesc(any())).thenReturn(Optional.empty());
+
+        ServiceOrderResponse result = sut.openServiceOrder(
+                customerUuid, vehicleUuid, "Barulho no motor", List.of(), List.of());
+
+        assertThat(result.uuid()).isEqualTo(osUuid);
+        assertThat(result.status()).isEqualTo(ServiceOrderStatus.RECEIVED);
+        verify(quoteRepository, never()).save(any());
+    }
+
+    @Test
+    void openServiceOrder_withItems_persistsLinesInProvisionalQuote() {
+        UUID customerUuid = UUID.randomUUID();
+        UUID vehicleUuid = UUID.randomUUID();
+        UUID msUuid = UUID.randomUUID();
+        UUID productUuid = UUID.randomUUID();
+
+        Customer customer = new Customer();
+        customer.setId(1L);
+
+        Vehicle vehicle = new Vehicle();
+        vehicle.setCustomer(customer);
+
+        MechanicalService ms = new MechanicalService();
+        ms.setName("Troca de óleo");
+        ms.setBasePrice(new BigDecimal("150.00"));
+        ms.setEstimatedDurationMinutes(30);
+
+        Product product = new Product();
+        product.setName("Óleo 5W30");
+        product.setUnitPrice(new BigDecimal("45.00"));
+
+        ServiceOrder saved = serviceOrderWithStatus(ServiceOrderStatus.RECEIVED);
+        Quote quote = new Quote();
+
+        when(customerService.findEntityByUuid(customerUuid)).thenReturn(customer);
+        when(vehicleService.findEntityByUuid(vehicleUuid)).thenReturn(vehicle);
+        when(mechanicalServiceRepository.findByUuid(msUuid)).thenReturn(Optional.of(ms));
+        when(productRepository.findByUuid(productUuid)).thenReturn(Optional.of(product));
+        when(serviceOrderRepository.save(any())).thenReturn(saved);
+        when(quoteRepository.findFirstByServiceOrderIdOrderByCreatedAtDesc(any())).thenReturn(Optional.of(quote));
+        when(quoteRepository.save(any())).thenReturn(quote);
+        when(mapper.toResponse(saved)).thenReturn(responseFor(saved));
+        when(mapper.toQuoteResponse(quote)).thenReturn(null);
+
+        sut.openServiceOrder(customerUuid, vehicleUuid, "Revisão", List.of(msUuid),
+                List.of(new OpenProductItemRequest(productUuid, new BigDecimal("2"))));
+
+        assertThat(quote.getServiceLines()).hasSize(1);
+        assertThat(quote.getServiceLines().get(0).getNameSnapshot()).isEqualTo("Troca de óleo");
+        assertThat(quote.getProductLines()).hasSize(1);
+        assertThat(quote.getProductLines().get(0).getNameSnapshot()).isEqualTo("Óleo 5W30");
+        assertThat(quote.getProductLines().get(0).getQuantity()).isEqualByComparingTo(new BigDecimal("2"));
+        assertThat(quote.getTotalAmount()).isEqualByComparingTo(new BigDecimal("240.00"));
+        verify(quoteRepository).save(quote);
+    }
+
+    @Test
+    void openServiceOrder_throwsNotFoundAndPersistsNothingWhenMechanicalServiceMissing() {
+        UUID customerUuid = UUID.randomUUID();
+        UUID vehicleUuid = UUID.randomUUID();
+        UUID msUuid = UUID.randomUUID();
+
+        Customer customer = new Customer();
+        customer.setId(1L);
+
+        Vehicle vehicle = new Vehicle();
+        vehicle.setCustomer(customer);
+
+        when(customerService.findEntityByUuid(customerUuid)).thenReturn(customer);
+        when(vehicleService.findEntityByUuid(vehicleUuid)).thenReturn(vehicle);
+        when(mechanicalServiceRepository.findByUuid(msUuid)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> sut.openServiceOrder(customerUuid, vehicleUuid, "Revisão",
+                List.of(msUuid), List.of()))
+                .isInstanceOf(MechanicalServiceNotFoundException.class);
+
+        verify(serviceOrderRepository, never()).save(any());
+    }
+
+    @Test
+    void openServiceOrder_throwsNotFoundAndPersistsNothingWhenProductMissing() {
+        UUID customerUuid = UUID.randomUUID();
+        UUID vehicleUuid = UUID.randomUUID();
+        UUID productUuid = UUID.randomUUID();
+
+        Customer customer = new Customer();
+        customer.setId(1L);
+
+        Vehicle vehicle = new Vehicle();
+        vehicle.setCustomer(customer);
+
+        when(customerService.findEntityByUuid(customerUuid)).thenReturn(customer);
+        when(vehicleService.findEntityByUuid(vehicleUuid)).thenReturn(vehicle);
+        when(productRepository.findByUuid(productUuid)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> sut.openServiceOrder(customerUuid, vehicleUuid, "Revisão",
+                List.of(), List.of(new OpenProductItemRequest(productUuid, BigDecimal.ONE))))
+                .isInstanceOf(ProductNotFoundException.class);
+
+        verify(serviceOrderRepository, never()).save(any());
+    }
+
+    @Test
+    void openServiceOrder_publishesStatusEventWithNullPreviousStatus() {
+        UUID customerUuid = UUID.randomUUID();
+        UUID vehicleUuid = UUID.randomUUID();
+        UUID osUuid = UUID.randomUUID();
+
+        Customer customer = new Customer();
+        customer.setId(1L);
+        customer.setEmail("cliente@mail.com");
+        customer.setName("Cliente Teste");
+
+        Vehicle vehicle = new Vehicle();
+        vehicle.setCustomer(customer);
+
+        ServiceOrder saved = serviceOrderWithStatus(ServiceOrderStatus.RECEIVED);
+        saved.setUuid(osUuid);
+        saved.setCustomer(customer);
+
+        when(customerService.findEntityByUuid(customerUuid)).thenReturn(customer);
+        when(vehicleService.findEntityByUuid(vehicleUuid)).thenReturn(vehicle);
+        when(serviceOrderRepository.save(any())).thenReturn(saved);
+        when(mapper.toResponse(saved)).thenReturn(responseFor(saved));
+        when(quoteRepository.findFirstByServiceOrderIdOrderByCreatedAtDesc(any())).thenReturn(Optional.empty());
+
+        sut.openServiceOrder(customerUuid, vehicleUuid, "Barulho no motor");
+
+        ServiceOrderStatusChangedEvent event = publishedStatusEvent();
+        assertThat(event.serviceOrderUuid()).isEqualTo(osUuid);
+        assertThat(event.previousStatus()).isNull();
+        assertThat(event.newStatus()).isEqualTo(ServiceOrderStatus.RECEIVED);
+        assertThat(event.customerEmail()).isEqualTo("cliente@mail.com");
+        assertThat(event.customerName()).isEqualTo("Cliente Teste");
+    }
+
     // -------------------------------------------------------------------------
     // startDiagnosis
     // -------------------------------------------------------------------------
@@ -105,6 +269,10 @@ class ServiceOrderServiceTest {
         ServiceOrderResponse result = sut.startDiagnosis(uuid);
 
         assertThat(result.status()).isEqualTo(ServiceOrderStatus.IN_DIAGNOSIS);
+
+        ServiceOrderStatusChangedEvent event = publishedStatusEvent();
+        assertThat(event.previousStatus()).isEqualTo(ServiceOrderStatus.RECEIVED);
+        assertThat(event.newStatus()).isEqualTo(ServiceOrderStatus.IN_DIAGNOSIS);
     }
 
     @Test
@@ -176,6 +344,63 @@ class ServiceOrderServiceTest {
         assertThat(page.getContent()).hasSize(1);
     }
 
+    @Test
+    void listServiceOrders_appliesExplicitCompletedFilterOverridingDefaultExclusion() {
+        ServiceOrder so = serviceOrderWithStatus(ServiceOrderStatus.COMPLETED);
+        when(serviceOrderRepository.findWithFilters(
+                eq(ServiceOrderStatus.COMPLETED), isNull(), isNull(), isNull(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(so)));
+        when(mapper.toResponse(so)).thenReturn(responseFor(so));
+        when(quoteRepository.findFirstByServiceOrderIdOrderByCreatedAtDesc(any())).thenReturn(Optional.empty());
+
+        var page = sut.listServiceOrders(ServiceOrderStatus.COMPLETED, null, null, null, Pageable.unpaged());
+
+        assertThat(page.getContent()).extracting(ServiceOrderResponse::status)
+                .containsExactly(ServiceOrderStatus.COMPLETED);
+        verify(serviceOrderRepository).findWithFilters(
+                eq(ServiceOrderStatus.COMPLETED), isNull(), isNull(), isNull(), any(Pageable.class));
+    }
+
+    @Test
+    void listServiceOrders_preservesBusinessPriorityOrderFromQuery() {
+        ServiceOrder inProgress = serviceOrderWithStatus(ServiceOrderStatus.IN_PROGRESS);
+        ServiceOrder awaiting = serviceOrderWithStatus(ServiceOrderStatus.AWAITING_APPROVAL);
+        ServiceOrder inDiagnosis = serviceOrderWithStatus(ServiceOrderStatus.IN_DIAGNOSIS);
+        ServiceOrder received = serviceOrderWithStatus(ServiceOrderStatus.RECEIVED);
+        ServiceOrder cancelled = serviceOrderWithStatus(ServiceOrderStatus.CANCELLED);
+
+        when(serviceOrderRepository.findWithFilters(isNull(), isNull(), isNull(), isNull(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(inProgress, awaiting, inDiagnosis, received, cancelled)));
+        when(mapper.toResponse(inProgress)).thenReturn(responseFor(inProgress));
+        when(mapper.toResponse(awaiting)).thenReturn(responseFor(awaiting));
+        when(mapper.toResponse(inDiagnosis)).thenReturn(responseFor(inDiagnosis));
+        when(mapper.toResponse(received)).thenReturn(responseFor(received));
+        when(mapper.toResponse(cancelled)).thenReturn(responseFor(cancelled));
+        when(quoteRepository.findFirstByServiceOrderIdOrderByCreatedAtDesc(any())).thenReturn(Optional.empty());
+
+        var page = sut.listServiceOrders(null, null, null, null, Pageable.unpaged());
+
+        assertThat(page.getContent()).extracting(ServiceOrderResponse::status)
+                .containsExactly(ServiceOrderStatus.IN_PROGRESS, ServiceOrderStatus.AWAITING_APPROVAL,
+                        ServiceOrderStatus.IN_DIAGNOSIS, ServiceOrderStatus.RECEIVED,
+                        ServiceOrderStatus.CANCELLED);
+    }
+
+    @Test
+    void listServiceOrders_dropsClientSortKeepingPageAndSize() {
+        when(serviceOrderRepository.findWithFilters(isNull(), isNull(), isNull(), isNull(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        sut.listServiceOrders(null, null, null, null,
+                PageRequest.of(2, 15, Sort.by(Sort.Direction.DESC, "createdAt")));
+
+        ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+        verify(serviceOrderRepository).findWithFilters(isNull(), isNull(), isNull(), isNull(), captor.capture());
+        assertThat(captor.getValue().getSort().isUnsorted()).isTrue();
+        assertThat(captor.getValue().getPageNumber()).isEqualTo(2);
+        assertThat(captor.getValue().getPageSize()).isEqualTo(15);
+    }
+
     // -------------------------------------------------------------------------
     // resendOTP
     // -------------------------------------------------------------------------
@@ -231,6 +456,10 @@ class ServiceOrderServiceTest {
         ServiceOrderResponse result = sut.completeExecution(uuid);
 
         assertThat(result.status()).isEqualTo(ServiceOrderStatus.COMPLETED);
+
+        ServiceOrderStatusChangedEvent event = publishedStatusEvent();
+        assertThat(event.previousStatus()).isEqualTo(ServiceOrderStatus.IN_PROGRESS);
+        assertThat(event.newStatus()).isEqualTo(ServiceOrderStatus.COMPLETED);
     }
 
     @Test
@@ -309,6 +538,10 @@ class ServiceOrderServiceTest {
 
         assertThat(so.getStatus()).isEqualTo(ServiceOrderStatus.DISPUTED);
         assertThat(result).isNotNull();
+
+        ServiceOrderStatusChangedEvent event = publishedStatusEvent();
+        assertThat(event.previousStatus()).isEqualTo(ServiceOrderStatus.COMPLETED);
+        assertThat(event.newStatus()).isEqualTo(ServiceOrderStatus.DISPUTED);
     }
 
     // -------------------------------------------------------------------------
@@ -415,6 +648,10 @@ class ServiceOrderServiceTest {
         sut.approveQuote(uuid, "52998224725", "token");
 
         verify(stockService).debit(eq(productUuid), eq(new BigDecimal("2")), eq(so), isNull());
+
+        ServiceOrderStatusChangedEvent event = publishedStatusEvent();
+        assertThat(event.previousStatus()).isEqualTo(ServiceOrderStatus.AWAITING_APPROVAL);
+        assertThat(event.newStatus()).isEqualTo(ServiceOrderStatus.IN_PROGRESS);
     }
 
     // -------------------------------------------------------------------------
@@ -528,6 +765,10 @@ class ServiceOrderServiceTest {
 
         assertThat(so.getStatus()).isEqualTo(ServiceOrderStatus.CANCELLED);
         verify(serviceOrderRepository).save(so);
+
+        ServiceOrderStatusChangedEvent event = publishedStatusEvent();
+        assertThat(event.previousStatus()).isEqualTo(ServiceOrderStatus.AWAITING_APPROVAL);
+        assertThat(event.newStatus()).isEqualTo(ServiceOrderStatus.CANCELLED);
     }
 
     // -------------------------------------------------------------------------
@@ -569,6 +810,10 @@ class ServiceOrderServiceTest {
         verify(stockService).compensate(eq(productUuid), eq(BigDecimal.TWO), eq(so), any());
         verify(quoteRepository).save(quote);
         assertThat(so.getStatus()).isEqualTo(ServiceOrderStatus.IN_PROGRESS);
+
+        ServiceOrderStatusChangedEvent event = publishedStatusEvent();
+        assertThat(event.previousStatus()).isEqualTo(ServiceOrderStatus.AWAITING_APPROVAL);
+        assertThat(event.newStatus()).isEqualTo(ServiceOrderStatus.IN_PROGRESS);
     }
 
     // -----------------------------------------------------------------------
@@ -743,6 +988,10 @@ class ServiceOrderServiceTest {
 
         assertThat(so.getStatus()).isEqualTo(ServiceOrderStatus.DELIVERED);
         verify(otpService, never()).validate(any(), any(), any());
+
+        ServiceOrderStatusChangedEvent event = publishedStatusEvent();
+        assertThat(event.previousStatus()).isEqualTo(ServiceOrderStatus.COMPLETED);
+        assertThat(event.newStatus()).isEqualTo(ServiceOrderStatus.DELIVERED);
     }
 
     @Test
@@ -786,6 +1035,10 @@ class ServiceOrderServiceTest {
         assertThat(so.getStatus()).isEqualTo(ServiceOrderStatus.IN_PROGRESS);
         verify(reworkCycleRepository).save(argThat(r -> r.getRejectionReason().equals("peças com defeito")));
         verify(notificationService).publishToRole(any(), any(), any(), eq(so));
+
+        ServiceOrderStatusChangedEvent event = publishedStatusEvent();
+        assertThat(event.previousStatus()).isEqualTo(ServiceOrderStatus.COMPLETED);
+        assertThat(event.newStatus()).isEqualTo(ServiceOrderStatus.IN_PROGRESS);
     }
 
     // -----------------------------------------------------------------------
@@ -891,6 +1144,10 @@ class ServiceOrderServiceTest {
         assertThat(so.getApprovalExpiresAt()).isNotNull();
         verify(otpService).generateAndSend(so);
         assertThat(result).isNotNull();
+
+        ServiceOrderStatusChangedEvent event = publishedStatusEvent();
+        assertThat(event.previousStatus()).isEqualTo(ServiceOrderStatus.IN_DIAGNOSIS);
+        assertThat(event.newStatus()).isEqualTo(ServiceOrderStatus.AWAITING_APPROVAL);
     }
 
     @Test
@@ -937,6 +1194,10 @@ class ServiceOrderServiceTest {
         assertThat(so.getStatus()).isEqualTo(ServiceOrderStatus.AWAITING_APPROVAL);
         assertThat(so.getApprovalExpiresAt()).isNotNull();
         verify(otpService).generateAndSend(so);
+
+        ServiceOrderStatusChangedEvent event = publishedStatusEvent();
+        assertThat(event.previousStatus()).isEqualTo(ServiceOrderStatus.IN_PROGRESS);
+        assertThat(event.newStatus()).isEqualTo(ServiceOrderStatus.AWAITING_APPROVAL);
     }
 
     @Test
@@ -1092,6 +1353,13 @@ class ServiceOrderServiceTest {
         ServiceOrder so = new ServiceOrder();
         so.setStatus(status);
         return so;
+    }
+
+    private ServiceOrderStatusChangedEvent publishedStatusEvent() {
+        ArgumentCaptor<ServiceOrderStatusChangedEvent> captor =
+                ArgumentCaptor.forClass(ServiceOrderStatusChangedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        return captor.getValue();
     }
 
     private ServiceOrderResponse responseFor(ServiceOrder so) {

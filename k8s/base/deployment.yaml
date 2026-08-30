@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: core
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tech-challenge-core
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tech-challenge-core
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+      containers:
+        - name: core
+          image: tech-challenge-core:latest
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: tech-challenge-core-config
+          env:
+            - name: JDBC_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: tech-challenge-core-secret
+                  key: jdbc-username
+            - name: JDBC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tech-challenge-core-secret
+                  key: jdbc-password
+            - name: MAIL_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: tech-challenge-core-secret
+                  key: mail-username
+            - name: MAIL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tech-challenge-core-secret
+                  key: mail-password
+          volumeMounts:
+            - name: jwt-certs
+              mountPath: /run/certs
+              readOnly: true
+          startupProbe:
+            httpGet:
+              path: /core/actuator/health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            httpGet:
+              path: /core/actuator/health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /core/actuator/health
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 3
+          # requests são obrigatórios para o HPA calcular utilização de CPU/memória
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+      volumes:
+        - name: jwt-certs
+          secret:
+            secretName: tech-challenge-core-secret
+            items:
+              - key: jwt-public-key
+                path: public.pem
+              - key: jwt-private-key
+                path: private.pem

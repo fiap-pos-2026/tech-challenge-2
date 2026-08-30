@@ -44,12 +44,13 @@ public class ServiceOrderController {
     @Operation(summary = "Open a new service order", operationId = "open-service-order")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Service order created"),
-            @ApiResponse(responseCode = "404", description = "Customer or vehicle not found")
+            @ApiResponse(responseCode = "404", description = "Customer, vehicle, service or product not found")
     })
     @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT')")
     public ResponseEntity<ServiceOrderResponse> open(@RequestBody @Valid OpenServiceOrderRequest request) {
         ServiceOrderResponse created = service.openServiceOrder(
-                request.customerUuid(), request.vehicleUuid(), request.customerComplaint());
+                request.customerUuid(), request.vehicleUuid(), request.customerComplaint(),
+                request.mechanicalServiceUuids(), request.products());
         return ResponseEntity.created(WebUtility.getLocation(created.uuid())).body(created);
     }
 

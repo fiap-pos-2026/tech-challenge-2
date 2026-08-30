@@ -1035,6 +1035,7 @@
           "item": [
             {
               "name": "Open Service Order",
+              "description": "`mechanicalServiceUuids` e `products` são opcionais (omitir ou enviar vazio cria a OS normalmente). Quando preenchidos, os itens são persistidos no orçamento provisório da OS já em `RECEIVED`. UUID de serviço/produto inexistente retorna 404 e não cria a OS.",
               "request": {
                 "method": "POST",
                 "header": [
@@ -1045,7 +1046,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"customerUuid\": \"{{customerUuid}}\",\n  \"vehicleUuid\": \"{{vehicleUuid}}\",\n  \"customerComplaint\": \"Barulho estranho ao frear e vibração no volante acima de 80 km/h.\"\n}"
+                  "raw": "{\n  \"customerUuid\": \"{{customerUuid}}\",\n  \"vehicleUuid\": \"{{vehicleUuid}}\",\n  \"customerComplaint\": \"Barulho estranho ao frear e vibração no volante acima de 80 km/h.\",\n  \"mechanicalServiceUuids\": [\n    \"{{mechanicalServiceUuid}}\"\n  ],\n  \"products\": [\n    {\n      \"productUuid\": \"{{productUuid}}\",\n      \"quantity\": 1\n    }\n  ]\n}"
                 },
                 "url": {
                   "raw": "{{baseUrl}}/api/service-orders",
@@ -1075,6 +1076,7 @@
             },
             {
               "name": "List Service Orders",
+              "description": "Sem `status` explícito, exclui `COMPLETED` e `DELIVERED` por padrão e ordena por prioridade de negócio: `IN_PROGRESS` > `AWAITING_APPROVAL` > `IN_DIAGNOSIS` > `RECEIVED` > demais status; dentro do mesmo status, `createdAt` ascendente (mais antigas primeiro). Um `status` explícito (incluindo `COMPLETED`/`DELIVERED`) sobrescreve a exclusão padrão e retorna só aquele status. Qualquer `sort` enviado é ignorado para preservar a prioridade de negócio.",
               "request": {
                 "method": "GET",
                 "url": {
@@ -1091,7 +1093,7 @@
                       "key": "status",
                       "value": "",
                       "disabled": true,
-                      "description": "RECEIVED | IN_DIAGNOSIS | AWAITING_APPROVAL | IN_PROGRESS | COMPLETED | DELIVERED | CANCELLED | DISPUTED"
+                      "description": "RECEIVED | IN_DIAGNOSIS | AWAITING_APPROVAL | IN_PROGRESS | COMPLETED | DELIVERED | CANCELLED | DISPUTED — sobrescreve a exclusão padrão de COMPLETED/DELIVERED"
                     },
                     {
                       "key": "customerUuid",

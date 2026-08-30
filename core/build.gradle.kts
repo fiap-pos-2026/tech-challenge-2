@@ -35,7 +35,9 @@ jacoco {
 }
 
 tasks.test {
-    ignoreFailures = true
+    // Falha de teste quebra o build por padrão. O override existe só para inspeção local do
+    // relatório completo e nunca é definido na pipeline.
+    ignoreFailures = System.getenv("IGNORE_TEST_FAILURES").toBoolean()
 }
 
 tasks.jacocoTestReport {

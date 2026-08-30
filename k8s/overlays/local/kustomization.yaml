@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+# Imagem publicada pelo workflow no GitHub Container Registry.
+# O pacote deve permanecer público para o microk8s baixar a imagem sem Secret.
+images:
+  - name: tech-challenge-core
+    newName: ghcr.io/fiap-pos-2026/tech-challenge-core
+    newTag: latest
+
+patches:
+  - path: patch-service-nodeport.yaml
+  - path: patch-deployment-local.yaml

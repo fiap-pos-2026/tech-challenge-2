@@ -1,5 +1,6 @@
 package br.com.fiap.pos.tech_challenge.core.service;
 
+import br.com.fiap.pos.tech_challenge.core.controller.dto.OpenProductItemRequest;
 import br.com.fiap.pos.tech_challenge.core.controller.dto.ServiceOrderResponse;
 import br.com.fiap.pos.tech_challenge.core.controller.dto.ServiceOrderStatusResponse;
 import br.com.fiap.pos.tech_challenge.core.domain.*;
@@ -18,10 +19,14 @@ import br.com.fiap.pos.tech_challenge.core.exception.ServiceOrderNotFoundExcepti
 import br.com.fiap.pos.tech_challenge.core.mapper.ServiceOrderMapper;
 import br.com.fiap.pos.tech_challenge.core.repository.*;
 import br.com.fiap.pos.tech_challenge.core.security.UserDetailsImpl;
+import br.com.fiap.pos.tech_challenge.core.service.event.ServiceOrderStatusChangedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -60,10 +65,19 @@ public class ServiceOrderService {
     private final AuthenticationService authenticationService;
     private final UserRepository userRepository;
     private final ServiceOrderMapper mapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public ServiceOrderResponse openServiceOrder(UUID customerUuid, UUID vehicleUuid,
                                                   String customerComplaint) {
+        return openServiceOrder(customerUuid, vehicleUuid, customerComplaint, null, null);
+    }
+
+    @Transactional
+    public ServiceOrderResponse openServiceOrder(UUID customerUuid, UUID vehicleUuid,
+                                                  String customerComplaint,
+                                                  List<UUID> mechanicalServiceUuids,
+                                                  List<OpenProductItemRequest> products) {
         Customer customer = customerService.findEntityByUuid(customerUuid);
         Vehicle vehicle = vehicleService.findEntityByUuid(vehicleUuid);
 
@@ -71,21 +85,24 @@ public class ServiceOrderService {
             throw new CoreException(EApplicationError.VEHICLE_NOT_OWNED_BY_CUSTOMER);
         }
 
+        List<MechanicalService> services = resolveMechanicalServices(mechanicalServiceUuids);
+        List<OpeningProductItem> productItems = resolveProducts(products);
+
         ServiceOrder so = new ServiceOrder();
-        so.setStatus(ServiceOrderStatus.RECEIVED);
         so.setCustomerComplaint(customerComplaint);
         so.setCustomer(customer);
         so.setVehicle(vehicle);
 
-        return buildResponse(serviceOrderRepository.save(so));
+        ServiceOrder saved = persistStatusChange(so, ServiceOrderStatus.RECEIVED);
+        attachOpeningItems(saved, services, productItems);
+        return buildResponse(saved);
     }
 
     @Transactional
     public ServiceOrderResponse startDiagnosis(UUID osUuid) {
         ServiceOrder so = findServiceOrder(osUuid);
         requireStatus(so, ServiceOrderStatus.RECEIVED);
-        so.setStatus(ServiceOrderStatus.IN_DIAGNOSIS);
-        return buildResponse(serviceOrderRepository.save(so));
+        return buildResponse(persistStatusChange(so, ServiceOrderStatus.IN_DIAGNOSIS));
     }
 
     // -----------------------------------------------------------------------
@@ -100,13 +117,7 @@ public class ServiceOrderService {
 
         Quote quote = getOrCreateProvisionalQuote(so);
 
-        QuoteServiceLine line = new QuoteServiceLine();
-        line.setQuote(quote);
-        line.setMechanicalService(ms);
-        line.setNameSnapshot(ms.getName());
-        line.setPriceSnapshot(ms.getBasePrice());
-        line.setEstimatedDurationMinutes(ms.getEstimatedDurationMinutes());
-        quote.getServiceLines().add(line);
+        quote.getServiceLines().add(buildServiceLine(quote, ms));
         quote.setTotalAmount(calculateTotal(quote));
         quoteRepository.save(quote);
         return buildResponse(so);
@@ -152,15 +163,7 @@ public class ServiceOrderService {
 
         Quote quote = getOrCreateProvisionalQuote(so);
 
-        QuoteProductLine line = new QuoteProductLine();
-        line.setQuote(quote);
-        line.setProduct(product);
-        line.setNameSnapshot(product.getName());
-        line.setUnitPriceSnapshot(product.getUnitPrice());
-        line.setQuantity(quantity);
-        line.setMeasurementUnit(product.getMeasurementUnit());
-        line.setUnbudgeted(false);
-        quote.getProductLines().add(line);
+        quote.getProductLines().add(buildProductLine(quote, product, quantity));
         quote.setTotalAmount(calculateTotal(quote));
         quoteRepository.save(quote);
         return buildResponse(so);
@@ -197,9 +200,8 @@ public class ServiceOrderService {
         quote.setTotalAmount(calculateTotal(quote));
         quoteRepository.save(quote);
 
-        so.setStatus(ServiceOrderStatus.AWAITING_APPROVAL);
         so.setApprovalExpiresAt(Instant.now().plus(APPROVAL_WINDOW_HOURS, ChronoUnit.HOURS));
-        ServiceOrder saved = serviceOrderRepository.save(so);
+        ServiceOrder saved = persistStatusChange(so, ServiceOrderStatus.AWAITING_APPROVAL);
 
         otpService.generateAndSend(saved);
         return buildResponse(saved);
@@ -227,8 +229,7 @@ public class ServiceOrderService {
         quote.setApprovedAt(Instant.now());
         quoteRepository.save(quote);
 
-        so.setStatus(ServiceOrderStatus.IN_PROGRESS);
-        ServiceOrder saved = serviceOrderRepository.save(so);
+        ServiceOrder saved = persistStatusChange(so, ServiceOrderStatus.IN_PROGRESS);
 
         if (firstApproval) {
             for (QuoteProductLine line : quote.getProductLines()) {
@@ -264,8 +265,7 @@ public class ServiceOrderService {
                 .filter(QuoteProductLine::isUnbudgeted).toList();
 
         if (unbudgeted.isEmpty()) {
-            so.setStatus(ServiceOrderStatus.CANCELLED);
-            ServiceOrder saved = serviceOrderRepository.save(so);
+            ServiceOrder saved = persistStatusChange(so, ServiceOrderStatus.CANCELLED);
             notificationService.publishToRole(UserRole.ATTENDANT, NotificationType.QUOTE_REJECTED,
                     "Orçamento da OS " + osUuid + " rejeitado pelo cliente.", saved);
             return buildResponse(saved);
@@ -279,8 +279,7 @@ public class ServiceOrderService {
         quote.setTotalAmount(calculateTotal(quote));
         quoteRepository.save(quote);
 
-        so.setStatus(ServiceOrderStatus.IN_PROGRESS);
-        ServiceOrder saved = serviceOrderRepository.save(so);
+        ServiceOrder saved = persistStatusChange(so, ServiceOrderStatus.IN_PROGRESS);
 
         notificationService.publishToRole(UserRole.MECHANIC, NotificationType.ADDENDUM_PRODUCT_REJECTED,
                 "Adendo da OS " + osUuid + " rejeitado pelo cliente.", saved);
@@ -342,9 +341,8 @@ public class ServiceOrderService {
         quoteRepository.save(quote);
 
         if (so.getStatus() == ServiceOrderStatus.IN_PROGRESS) {
-            so.setStatus(ServiceOrderStatus.AWAITING_APPROVAL);
             so.setApprovalExpiresAt(Instant.now().plus(APPROVAL_WINDOW_HOURS, ChronoUnit.HOURS));
-            so = serviceOrderRepository.save(so);
+            so = persistStatusChange(so, ServiceOrderStatus.AWAITING_APPROVAL);
             otpService.generateAndSend(so);
         }
 
@@ -386,8 +384,7 @@ public class ServiceOrderService {
     public ServiceOrderResponse completeExecution(UUID osUuid) {
         ServiceOrder so = findServiceOrder(osUuid);
         requireStatus(so, ServiceOrderStatus.IN_PROGRESS);
-        so.setStatus(ServiceOrderStatus.COMPLETED);
-        ServiceOrder saved = serviceOrderRepository.save(so);
+        ServiceOrder saved = persistStatusChange(so, ServiceOrderStatus.COMPLETED);
         otpService.generateAndSend(saved);
         notificationService.publishToRole(UserRole.ATTENDANT, NotificationType.EXECUTION_COMPLETED,
                 "OS " + osUuid + " concluída pelo mecânico. Cliente notificado para vistoria de entrega.", saved);
@@ -406,8 +403,7 @@ public class ServiceOrderService {
             otpService.validate(osUuid, customerDocument, tokenRaw);
         }
 
-        so.setStatus(ServiceOrderStatus.DELIVERED);
-        return buildResponse(serviceOrderRepository.save(so));
+        return buildResponse(persistStatusChange(so, ServiceOrderStatus.DELIVERED));
     }
 
     // -----------------------------------------------------------------------
@@ -420,8 +416,7 @@ public class ServiceOrderService {
         ServiceOrder so = findServiceOrder(osUuid);
         requireStatus(so, ServiceOrderStatus.COMPLETED);
 
-        so.setStatus(ServiceOrderStatus.IN_PROGRESS);
-        ServiceOrder saved = serviceOrderRepository.save(so);
+        ServiceOrder saved = persistStatusChange(so, ServiceOrderStatus.IN_PROGRESS);
 
         Quote quote = latestQuote(saved);
         int totalEstimatedMinutes = quote.getServiceLines().stream()
@@ -454,8 +449,7 @@ public class ServiceOrderService {
             throw new InvalidStatusTransitionException();
         }
 
-        so.setStatus(ServiceOrderStatus.DISPUTED);
-        ServiceOrder saved = serviceOrderRepository.save(so);
+        ServiceOrder saved = persistStatusChange(so, ServiceOrderStatus.DISPUTED);
 
         notificationService.publishToRole(UserRole.MECHANIC, NotificationType.ORDER_DISPUTED,
                 "OS " + osUuid + " encerrada como DISPUTED. Resolução: " + resolution, saved);
@@ -486,13 +480,22 @@ public class ServiceOrderService {
                                                          LocalDateTime from, LocalDateTime to,
                                                          Pageable pageable) {
         return serviceOrderRepository
-                .findWithFilters(status, customerUuid, from, to, pageable)
+                .findWithFilters(status, customerUuid, from, to, withoutClientSort(pageable))
                 .map(this::buildResponse);
     }
 
     // -----------------------------------------------------------------------
     // Private helpers
     // -----------------------------------------------------------------------
+    // A ordem de prioridade da listagem é definida na query; o sort enviado pelo client é descartado
+    // para não sobrescrevê-la.
+    private Pageable withoutClientSort(Pageable pageable) {
+        if (pageable == null || pageable.isUnpaged()) {
+            return Pageable.unpaged();
+        }
+        return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.unsorted());
+    }
+
     private ServiceOrder findServiceOrder(UUID uuid) {
         return serviceOrderRepository.findByUuid(uuid)
                 .orElseThrow(ServiceOrderNotFoundException::new);
@@ -502,6 +505,70 @@ public class ServiceOrderService {
         if (so.getStatus() != required) {
             throw new InvalidStatusTransitionException();
         }
+    }
+
+    private ServiceOrder persistStatusChange(ServiceOrder so, ServiceOrderStatus newStatus) {
+        ServiceOrderStatus previousStatus = so.getStatus();
+        so.setStatus(newStatus);
+        ServiceOrder saved = serviceOrderRepository.save(so);
+        Customer customer = saved.getCustomer();
+        eventPublisher.publishEvent(new ServiceOrderStatusChangedEvent(
+                saved.getUuid(), previousStatus, saved.getStatus(),
+                customer != null ? customer.getEmail() : null,
+                customer != null ? customer.getName() : null));
+        return saved;
+    }
+
+    private List<MechanicalService> resolveMechanicalServices(List<UUID> mechanicalServiceUuids) {
+        if (mechanicalServiceUuids == null) return List.of();
+        return mechanicalServiceUuids.stream()
+                .map(uuid -> mechanicalServiceRepository.findByUuid(uuid)
+                        .orElseThrow(MechanicalServiceNotFoundException::new))
+                .toList();
+    }
+
+    private List<OpeningProductItem> resolveProducts(List<OpenProductItemRequest> products) {
+        if (products == null) return List.of();
+        return products.stream()
+                .map(item -> new OpeningProductItem(
+                        productRepository.findByUuid(item.productUuid())
+                                .orElseThrow(ProductNotFoundException::new),
+                        item.quantity()))
+                .toList();
+    }
+
+    private void attachOpeningItems(ServiceOrder so, List<MechanicalService> services,
+                                     List<OpeningProductItem> productItems) {
+        if (services.isEmpty() && productItems.isEmpty()) return;
+
+        Quote quote = getOrCreateProvisionalQuote(so);
+        services.forEach(ms -> quote.getServiceLines().add(buildServiceLine(quote, ms)));
+        productItems.forEach(item -> quote.getProductLines()
+                .add(buildProductLine(quote, item.product(), item.quantity())));
+        quote.setTotalAmount(calculateTotal(quote));
+        quoteRepository.save(quote);
+    }
+
+    private QuoteServiceLine buildServiceLine(Quote quote, MechanicalService ms) {
+        QuoteServiceLine line = new QuoteServiceLine();
+        line.setQuote(quote);
+        line.setMechanicalService(ms);
+        line.setNameSnapshot(ms.getName());
+        line.setPriceSnapshot(ms.getBasePrice());
+        line.setEstimatedDurationMinutes(ms.getEstimatedDurationMinutes());
+        return line;
+    }
+
+    private QuoteProductLine buildProductLine(Quote quote, Product product, BigDecimal quantity) {
+        QuoteProductLine line = new QuoteProductLine();
+        line.setQuote(quote);
+        line.setProduct(product);
+        line.setNameSnapshot(product.getName());
+        line.setUnitPriceSnapshot(product.getUnitPrice());
+        line.setQuantity(quantity);
+        line.setMeasurementUnit(product.getMeasurementUnit());
+        line.setUnbudgeted(false);
+        return line;
     }
 
     private Quote getOrCreateProvisionalQuote(ServiceOrder so) {
@@ -541,5 +608,8 @@ public class ServiceOrderService {
                         base.uuid(), base.status(), base.customerComplaint(),
                         mapper.toQuoteResponse(q), base.createdAt()))
                 .orElse(base);
+    }
+
+    private record OpeningProductItem(Product product, BigDecimal quantity) {
     }
 }

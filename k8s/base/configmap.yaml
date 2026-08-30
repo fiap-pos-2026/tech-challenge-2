@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tech-challenge-core-config
+data:
+  SPRING_PROFILES_ACTIVE: prd
+  JDBC_HOST: postgres
+  JDBC_PORT: "5432"
+  JDBC_SERVICENAME: techbase
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  MAIL_HOST: mailpit
+  MAIL_PORT: "1025"
+  LIQUIBASE_ENABLED: "true"
+  # Caminhos dos PEMs montados a partir do Secret — o conteúdo das chaves nunca fica no ConfigMap
+  JWT_PUBLIC_KEY: file:/run/certs/public.pem
+  JWT_PRIVATE_KEY: file:/run/certs/private.pem

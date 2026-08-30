@@ -51,6 +51,7 @@ services:
       JDBC_PASSWORD: techdevpw
       JWT_PUBLIC_KEY: file:/run/certs/dev-public.pem
       JWT_PRIVATE_KEY: file:/run/certs/dev-private.pem
+      LIQUIBASE_ENABLED: "true"
       MAIL_HOST: mailpit
       MAIL_PORT: 1025
       REDIS_HOST: redis

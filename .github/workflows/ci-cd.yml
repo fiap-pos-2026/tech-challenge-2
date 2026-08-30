@@ -1,0 +1,136 @@
+name: CI/CD
+
+on:
+  push:
+    branches:
+      - main
+      - feature/tech-challenge-2
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch: {}
+
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: ghcr.io/fiap-pos-2026/tech-challenge-core
+
+jobs:
+  # Build + testes automatizados em runner GitHub-hosted. Falha aqui bloqueia os
+  # estágios seguintes via `needs`.
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Build
+        run: ./gradlew :core:assemble --console=plain
+
+      # `IGNORE_TEST_FAILURES` é fixado em false para que o override local nunca vaze do
+      # ambiente do runner: qualquer teste falhando derruba este job e, por `needs`, os seguintes.
+      - name: Test
+        env:
+          IGNORE_TEST_FAILURES: "false"
+        run: ./gradlew :core:test --console=plain
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: core/build/reports/tests/test
+          retention-days: 7
+
+  # Constrói e publica a imagem Docker no GitHub Container Registry.
+  # Roda apenas em push ou execução manual, nunca em pull request.
+  docker-image:
+    name: Build & Push Docker Image
+    needs: build-and-test
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build image
+        run: |
+          docker build \
+            -f core/Dockerfile \
+            -t ${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            -t ${{ env.IMAGE_NAME }}:latest \
+            .
+
+      - name: Push image to GHCR
+        run: |
+          docker push ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker push ${{ env.IMAGE_NAME }}:latest
+
+  # Provisiona/atualiza namespace, PostgreSQL, Redis e Mailpit via Terraform
+  # sobre o cluster microk8s já existente. Não instala o cluster.
+  terraform-apply:
+    name: Terraform Apply (infra)
+    needs: docker-image
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: [self-hosted, wsl2, microk8s]
+    defaults:
+      run:
+        working-directory: infra
+    env:
+      TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
+      TF_VAR_manage_microk8s: "false"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Terraform Init
+        run: terraform init -input=false
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve -input=false
+
+  # Aplica os manifests Kustomize da app no microk8s usando a tag SHA publicada.
+  # Falha em qualquer estágio anterior impede que este job execute.
+  deploy:
+    name: Deploy (kubectl apply -k)
+    needs: terraform-apply
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: [self-hosted, wsl2, microk8s]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Render and apply Kustomize overlay
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="${IMAGE_NAME}:${GITHUB_SHA}"
+          kubectl kustomize k8s/overlays/local \
+            | sed "s|${IMAGE_NAME}:latest|${image}|g" \
+            | kubectl apply -f -
+
+      - name: Wait for rollout
+        run: kubectl -n tech-challenge rollout status deployment/core --timeout=180s
