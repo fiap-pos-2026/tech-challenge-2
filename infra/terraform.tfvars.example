@@ -12,3 +12,6 @@ namespace   = "tech-challenge"
 db_name     = "techbase"
 db_username = "techdev"
 db_password = "CHANGE_ME"
+
+ghcr_username   = "johncgo"
+ghcr_pull_token = ""

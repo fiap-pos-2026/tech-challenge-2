@@ -28,6 +28,11 @@ output "postgres_credentials_secret" {
   value       = kubernetes_secret.postgres.metadata[0].name
 }
 
+output "ghcr_pull_secret" {
+  description = "Nome do Secret de pull do GHCR, ou null quando ghcr_pull_token não foi fornecido."
+  value       = one(kubernetes_secret.ghcr_pull[*].metadata[0].name)
+}
+
 output "redis_service" {
   description = "Nome do Service do Redis (usar como REDIS_HOST na app)."
   value       = kubernetes_service.redis.metadata[0].name

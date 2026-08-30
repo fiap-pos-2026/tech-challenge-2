@@ -12,6 +12,7 @@ ou cloud)": o cluster em si (`cluster.tf`) e o banco de dados (`main.tf`).
 | Cluster Kubernetes | `null_resource` + `local-exec` (`cluster.tf`) | microk8s (serviço snap no host) | Instala o snap se ausente, habilita addons `dns`/`storage`/`metrics-server` e gera o kubeconfig; idempotente — pula o que já está pronto. Desligável via `manage_microk8s = false` (ver abaixo) |
 | Namespace da aplicação | `kubernetes_namespace` | `tech-challenge` (var `namespace`) | Mesmo namespace usado pelo Kustomize em `/k8s` |
 | Credenciais do PostgreSQL | `kubernetes_secret` | `postgres-credentials` | `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` |
+| Pull da imagem privada no GHCR | `kubernetes_secret` (`kubernetes.io/dockerconfigjson`) | `ghcr-pull` | Criado só quando `ghcr_pull_token` é fornecido; referenciado por `imagePullSecrets` em `k8s/base/deployment.yaml`. No CI vem do secret `GHCR_PULL_PAT` |
 | Banco de dados | `kubernetes_stateful_set` + `kubernetes_service` | `postgres` | Imagem `postgres:18.4-alpine` (mesma do `docker-compose.yml`); volume persistente |
 | Cache / rate limiting | `kubernetes_deployment` + `kubernetes_service` | `redis` | Imagem `redis:7-alpine` (mesma do `docker-compose.yml`); sem senha, sem persistência (`--save ""`) |
 | E-mail local | `kubernetes_deployment` + `kubernetes_service` | `mailpit` | Imagem `axllent/mailpit:latest`; SMTP na porta `1025` e interface web na `8025` |
@@ -99,6 +100,8 @@ dois:
 | `postgres_image` | `postgres:18.4-alpine` | Imagem do PostgreSQL |
 | `postgres_storage_size` | `2Gi` | Tamanho do volume persistente do PostgreSQL |
 | `redis_image` | `redis:7-alpine` | Imagem do Redis |
+| `ghcr_username` | `johncgo` | Owner do pacote da imagem no GHCR; vira `docker-username` no Secret `ghcr-pull` |
+| `ghcr_pull_token` | *(vazio)* | Token GitHub com escopo `read:packages`. Vazio = não cria o Secret `ghcr-pull` (imagem pública ou build local). No CI vem de `TF_VAR_ghcr_pull_token` (secret `GHCR_PULL_PAT`); nunca commitar o valor real |
 
 Copie o exemplo e ajuste os valores reais (o arquivo `terraform.tfvars` é ignorado pelo git):
 
@@ -146,6 +149,7 @@ terraform import kubernetes_deployment.redis tech-challenge/redis
 terraform import kubernetes_service.redis tech-challenge/redis
 terraform import kubernetes_deployment.mailpit tech-challenge/mailpit
 terraform import kubernetes_service.mailpit tech-challenge/mailpit
+terraform import 'kubernetes_secret.ghcr_pull[0]' tech-challenge/ghcr-pull
 ```
 
 Após o `apply`, crie o Secret real da aplicação com a **mesma senha** usada em `db_password`

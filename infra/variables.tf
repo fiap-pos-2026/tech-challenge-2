@@ -57,3 +57,16 @@ variable "redis_image" {
   type        = string
   default     = "redis:7-alpine"
 }
+
+variable "ghcr_username" {
+  description = "Owner do pacote da imagem no GHCR. Usado como docker-username no Secret ghcr-pull."
+  type        = string
+  default     = "johncgo"
+}
+
+variable "ghcr_pull_token" {
+  description = "Token com escopo read:packages para o pull da imagem privada no GHCR. Vazio não cria o Secret ghcr-pull."
+  type        = string
+  default     = ""
+  sensitive   = true
+}

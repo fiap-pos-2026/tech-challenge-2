@@ -13,6 +13,29 @@ resource "kubernetes_namespace" "tech_challenge" {
   }
 }
 
+resource "kubernetes_secret" "ghcr_pull" {
+  count = var.ghcr_pull_token != "" ? 1 : 0
+
+  metadata {
+    name      = "ghcr-pull"
+    namespace = kubernetes_namespace.tech_challenge.metadata[0].name
+  }
+
+  type = "kubernetes.io/dockerconfigjson"
+
+  data = {
+    ".dockerconfigjson" = jsonencode({
+      auths = {
+        "ghcr.io" = {
+          username = var.ghcr_username
+          password = var.ghcr_pull_token
+          auth     = base64encode("${var.ghcr_username}:${var.ghcr_pull_token}")
+        }
+      }
+    })
+  }
+}
+
 resource "kubernetes_secret" "postgres" {
   metadata {
     name      = "postgres-credentials"

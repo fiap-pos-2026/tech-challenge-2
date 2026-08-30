@@ -206,7 +206,9 @@ Swagger UI disponível em: `http://localhost:8080/core/swagger-ui.html`
 
 Manifests em `/k8s`, organizados em `base` (Deployment, Service, ConfigMap, Secret de exemplo, HPA) e
 overlay `local` (imagem do GHCR, NodePort, requests reduzidos para o nó único do WSL2). A imagem
-`ghcr.io/fiap-pos-2026/tech-challenge-core` é pública e é publicada pelo workflow de CI/CD:
+`ghcr.io/johncgo/tech-challenge-core` é privada e publicada pelo workflow de CI/CD; o cluster a baixa
+autenticado via Secret `ghcr-pull` (`imagePullSecrets` em `k8s/base/deployment.yaml`), provisionado
+pelo Terraform quando `ghcr_pull_token` é informado:
 
 ```bash
 # 1. Verifique o cluster e habilite os addons necessários
@@ -217,7 +219,8 @@ microk8s kubectl get nodes
 # 2. Provisione namespace, PostgreSQL, Redis e Mailpit
 cd infra
 cp terraform.tfvars.example terraform.tfvars
-# Edite terraform.tfvars e informe db_password
+# Edite terraform.tfvars: informe db_password e, para puxar a imagem privada do GHCR,
+# ghcr_pull_token (PAT com escopo read:packages)
 terraform init
 terraform plan -var-file=terraform.tfvars
 terraform apply -var-file=terraform.tfvars
@@ -238,7 +241,7 @@ kubectl apply -k k8s/overlays/local
 
 # 5. Em uma execução manual, fixe a tag publicada desejada
 kubectl -n tech-challenge set image deployment/core \
-  core=ghcr.io/fiap-pos-2026/tech-challenge-core:latest
+  core=ghcr.io/johncgo/tech-challenge-core:latest
 ```
 
 A aplicação responde em `http://<ip-do-node>:30080/core`. Para descobrir o IP do
@@ -299,18 +302,22 @@ terraform version
 kubectl get nodes
 ```
 
-Crie também o Secret do repositório **`TF_VAR_DB_PASSWORD`** em
-**Settings → Secrets and variables → Actions**. O valor precisa ser igual à senha
-usada pelo PostgreSQL.
+Crie os Secrets do repositório em **Settings → Secrets and variables → Actions**:
+
+| Secret | Valor |
+|---|---|
+| `TF_VAR_DB_PASSWORD` | Mesma senha usada pelo PostgreSQL (`db_password`) |
+| `GHCR_PULL_PAT` | PAT do GitHub com escopo `read:packages`. O job `terraform-apply` o passa como `TF_VAR_ghcr_pull_token`, e o Terraform cria o Secret `ghcr-pull` no namespace para o microk8s baixar a imagem privada |
 
 Antes do primeiro workflow, migre o estado local do Terraform para o backend Kubernetes seguindo
 o procedimento em [`infra/README.md`](infra/README.md#estado-compartilhado-pelo-ci). Sem essa
 migração, o CI não reconhece recursos criados manualmente e tenta recriá-los.
 
 O workflow usa o `GITHUB_TOKEN` para publicar no GHCR. Em **Settings → Actions → General**,
-confirme que o repositório permite que workflows criem e publiquem pacotes. No pacote
-`tech-challenge-core`, configure a visibilidade como **Public** para que o microk8s faça o pull
-sem `imagePullSecret`.
+confirme que o repositório permite que workflows criem e publiquem pacotes. O pacote
+`tech-challenge-core` permanece **privado**: o microk8s faz o pull autenticado pelo Secret
+`ghcr-pull` (provisionado pelo Terraform a partir de `GHCR_PULL_PAT`), então não é preciso
+tornar o pacote público.
 
 #### Gatilhos do workflow
 

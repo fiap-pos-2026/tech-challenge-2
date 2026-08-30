@@ -4,8 +4,6 @@ kind: Kustomization
 resources:
   - ../../base
 
-# Imagem publicada pelo workflow no GitHub Container Registry.
-# O pacote deve permanecer público para o microk8s baixar a imagem sem Secret.
 images:
   - name: tech-challenge-core
     newName: ghcr.io/johncgo/tech-challenge-core
