@@ -8,7 +8,7 @@ resources:
 # O pacote deve permanecer público para o microk8s baixar a imagem sem Secret.
 images:
   - name: tech-challenge-core
-    newName: ghcr.io/fiap-pos-2026/tech-challenge-core
+    newName: ghcr.io/johncgo/tech-challenge-core
     newTag: latest
 
 patches:

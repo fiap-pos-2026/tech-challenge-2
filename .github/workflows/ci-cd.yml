@@ -19,7 +19,7 @@ permissions:
   packages: write
 
 env:
-  IMAGE_NAME: ghcr.io/fiap-pos-2026/tech-challenge-core
+  IMAGE_NAME: ghcr.io/johncgo/tech-challenge-core
 
 jobs:
   # Build + testes automatizados em runner GitHub-hosted. Falha aqui bloqueia os
