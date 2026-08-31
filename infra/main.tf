@@ -4,8 +4,8 @@
 # casam com JDBC_HOST/REDIS_HOST já esperados por k8s/base/configmap.yaml (`postgres`, `redis`).
 
 resource "kubernetes_namespace" "tech_challenge" {
-  # Garante que o cluster (microk8s instalado/habilitado em cluster.tf, quando
-  # manage_microk8s = true) já existe antes de qualquer recurso kubernetes_* ser aplicado.
+  # Garante que o cluster (validado/provisionado por cluster.tf a cada apply) já existe
+  # antes de qualquer recurso kubernetes_* ser aplicado.
   depends_on = [null_resource.microk8s]
 
   metadata {

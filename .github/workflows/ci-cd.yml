@@ -86,8 +86,9 @@ jobs:
           docker push ${{ env.IMAGE_NAME }}:${{ github.sha }}
           docker push ${{ env.IMAGE_NAME }}:latest
 
-  # Provisiona/atualiza namespace, PostgreSQL, Redis e Mailpit via Terraform
-  # sobre o cluster microk8s já existente. Não instala o cluster.
+  # Provisiona/atualiza o cluster microk8s (cluster.tf instala se ausente, sobe se parado,
+  # garante os addons) e namespace, PostgreSQL, Redis e Mailpit via Terraform. Idempotente:
+  # se o cluster já existe, só reconcilia os recursos.
   terraform-apply:
     name: Terraform Apply (infra)
     needs: docker-image
@@ -95,17 +96,22 @@ jobs:
     runs-on: [self-hosted, wsl2, microk8s]
     defaults:
       run:
+        shell: bash
         working-directory: infra
     env:
       TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
-      TF_VAR_manage_microk8s: "false"
       TF_VAR_ghcr_pull_token: ${{ secrets.GHCR_PULL_PAT }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Terraform Init
-        run: terraform init -input=false
+        run: |
+          # State local fora do checkout (o backend "kubernetes" não serve: o init roda antes
+          # de o cluster existir). Sobrevive entre runs no runner self-hosted persistente.
+          state_path="$HOME/.local/state/tech-challenge/terraform.tfstate"
+          mkdir -p "$(dirname "$state_path")"
+          terraform init -input=false -backend-config="path=$state_path"
 
       - name: Terraform Validate
         run: terraform validate

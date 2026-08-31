@@ -1,10 +1,10 @@
-# Quando manage_microk8s = true (default), o kubeconfig referenciado abaixo é gerado pelo
-# próprio Terraform em cluster.tf (`microk8s config > kubeconfig_path`) antes destes providers
-# serem usados. Quando manage_microk8s = false, ele deve apontar para um kubeconfig já existente
-# de um cluster provisionado por outro meio (local ou cloud). Ver `infra/README.md`.
+# O kubeconfig referenciado abaixo é gerado/atualizado pelo próprio Terraform em cluster.tf
+# (`microk8s config > kubeconfig_path`) antes destes providers serem usados. Para um cluster
+# gerenciado na cloud, substitua cluster.tf e aponte este caminho (e kube_context) para o
+# kubeconfig desse cluster. Ver `infra/README.md`.
 
 variable "kubeconfig_path" {
-  description = "Caminho do kubeconfig do cluster. Com manage_microk8s = true é o destino de `microk8s config`; com manage_microk8s = false, deve apontar para um kubeconfig já existente."
+  description = "Caminho do kubeconfig do cluster — destino de `microk8s config` em cluster.tf e fonte dos providers kubernetes/helm."
   type        = string
   default     = "~/.kube/config"
 }

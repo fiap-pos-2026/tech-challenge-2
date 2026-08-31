@@ -9,7 +9,7 @@ ou cloud)": o cluster em si (`cluster.tf`) e o banco de dados (`main.tf`).
 
 | Recurso | Tipo Terraform | Nome no cluster | Observação |
 | ------- | -------------- | ---------------- | ---------- |
-| Cluster Kubernetes | `null_resource` + `local-exec` (`cluster.tf`) | microk8s (serviço snap no host) | Instala o snap se ausente, habilita addons `dns`/`storage`/`metrics-server` e gera o kubeconfig; idempotente — pula o que já está pronto. Desligável via `manage_microk8s = false` (ver abaixo) |
+| Cluster Kubernetes | `null_resource` + `local-exec` (`cluster.tf`) | microk8s (serviço snap no host) | A cada apply valida o ambiente: instala o snap se ausente, sobe o cluster se parado, garante os addons `dns`/`storage`/`metrics-server` e (re)gera o kubeconfig. Idempotente — pula o que já está pronto. Não há flag para desligar; para cloud, ver abaixo |
 | Namespace da aplicação | `kubernetes_namespace` | `tech-challenge` (var `namespace`) | Mesmo namespace usado pelo Kustomize em `/k8s` |
 | Credenciais do PostgreSQL | `kubernetes_secret` | `postgres-credentials` | `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` |
 | Pull da imagem privada no GHCR | `kubernetes_secret` (`kubernetes.io/dockerconfigjson`) | `ghcr-pull` | Criado só quando `ghcr_pull_token` é fornecido; referenciado por `imagePullSecrets` em `k8s/base/deployment.yaml`. No CI vem do secret `GHCR_PULL_PAT` |
@@ -25,73 +25,49 @@ de ambiente da aplicação precisa mudar para consumir esta infra.
 
 microk8s roda como serviço no próprio host (WSL2/Ubuntu) — não é algo que o provider `kubernetes`
 cria, pois esse provider já pressupõe um cluster respondendo. Por isso `cluster.tf` usa um
-`null_resource` com `local-exec`: instala o snap do microk8s quando ausente, aguarda o cluster
-ficar pronto, habilita os addons e escreve o kubeconfig que os providers `kubernetes`/`helm`
-(`providers.tf`) passam a usar. O script é idempotente — reexecuta sem efeito colateral se o
-cluster já existir — para caber tanto no primeiro `apply` quanto nas execuções seguintes do CI.
+`null_resource` com `local-exec` que, **a cada `apply`**, valida o ambiente e age só no que
+falta: instala o snap do microk8s quando ausente, sobe o cluster se estiver parado, garante os
+addons e (re)escreve o kubeconfig que os providers `kubernetes`/`helm` (`providers.tf`) passam a
+usar. O script é idempotente — reexecuta sem efeito colateral se o cluster já existir — então
+cobre tanto o primeiro `apply` numa máquina limpa quanto as execuções seguintes do CI. Não há
+mais a flag `manage_microk8s`: "se não existir cluster, cria".
 
 ### Cobrindo a opção "cloud" do mesmo requisito
 
-Para apontar para um cluster gerenciado (EKS/GKE/AKS) ou qualquer cluster já provisionado por
-outro meio, defina `manage_microk8s = false`: o Terraform pula a instalação do microk8s e só se
-conecta ao cluster via `kubeconfig_path`/`kube_context`, mantendo namespace, banco e demais
-recursos deste módulo exatamente iguais.
+Para apontar para um cluster gerenciado (EKS/GKE/AKS), substitua `cluster.tf` pelo módulo do
+provider correspondente e aponte `kubeconfig_path`/`kube_context` para o kubeconfig desse
+cluster. Namespace, banco e demais recursos deste módulo (`main.tf`) continuam exatamente iguais.
 
 ## Pré-requisitos
 
 1. **Terraform** ≥ 1.6 instalado.
-2. Host Ubuntu/WSL2 com **snap** disponível.
-3. `sudo` funcionando normalmente (com senha) — este módulo **não exige e não configura
-   `sudo` sem senha**. Ver "Autenticação do sudo" abaixo para como isso funciona na prática,
-   tanto localmente quanto no CI.
-4. Se `manage_microk8s = false`: um cluster Kubernetes já existente (local ou cloud) e seu
-   **kubeconfig** disponível, apontado pela variável `kubeconfig_path`.
+2. Host Ubuntu/WSL2 com **snap** disponível (e systemd ativo no WSL).
+3. `sudo` disponível para snap/microk8s/usermod. Ver "Autenticação do sudo" abaixo — no CI
+   isso significa **sudo sem senha** para esses binários (o `local-exec` não é interativo).
 
 ### Autenticação do sudo
 
 `cluster.tf` roda `sudo snap install microk8s`, `sudo microk8s enable ...` etc. dentro de um
-`local-exec`, que não é interativo — não há como o Terraform "parar" no meio do apply e pedir sua
-senha. Por isso este módulo usa dois fluxos diferentes, sem NOPASSWD em sudoers em nenhum dos
-dois:
+`local-exec`, que não é interativo — não há como o Terraform "parar" no meio do apply e pedir uma
+senha.
 
-- **Localmente (você, no WSL, com `manage_microk8s = true`)**: autentique o `sudo` *antes* de
-  rodar o Terraform, no mesmo terminal:
+- **Localmente (você, no WSL, no seu terminal)**: autentique o `sudo` *antes* de rodar o
+  Terraform, no mesmo terminal, com `sudo -v`. Isso guarda a autorização no cache do sudo
+  (15 min por padrão no Ubuntu); os comandos `sudo` dentro do `local-exec` herdam essa
+  autenticação. Renove com `sudo -v` em outro terminal se o apply demorar mais que isso.
 
-  ```bash
-  sudo -v
-  ```
-
-  Isso pede sua senha uma única vez e guarda a autorização no cache do sudo (15 min por padrão
-  no Ubuntu). Enquanto esse cache estiver válido, os comandos `sudo` dentro do `local-exec`
-  herdam a autenticação sem pedir senha de novo. Se a instalação do microk8s demorar mais que
-  isso, rode `sudo -v` de novo em outro terminal para renovar o cache sem interromper o apply.
-
-- **No runner self-hosted do CI (`manage_microk8s = false`)**: o CI nunca roda comandos que
-  exigem sudo. O microk8s do runner é instalado e habilitado **manualmente, uma única vez**,
-  por quem configura o runner (com `sudo` interativo normal — os mesmos comandos que
-  `cluster.tf` automatiza, rodados à mão):
-
-  ```bash
-  sudo snap install microk8s --classic --channel=1.31/stable
-  sudo usermod -aG microk8s "$USER"
-  # relogue o shell para o grupo `microk8s` valer, depois:
-  microk8s status --wait-ready
-  microk8s enable dns storage metrics-server
-  mkdir -p ~/.kube
-  microk8s config > ~/.kube/config
-  ```
-
-  Depois disso, o Terraform do CI só se conecta ao cluster já pronto via `kubeconfig_path` —
-  ver a variável `TF_VAR_manage_microk8s: "false"` em `.github/workflows/ci-cd.yml`.
+- **No runner self-hosted do CI**: o `terraform apply` do CI roda `cluster.tf` de forma
+  totalmente automatizada, então o usuário do runner precisa de **sudo sem senha** restrito a
+  `snap`, `microk8s` e `usermod`. Como configurar isso (sudoers drop-in), além de systemd no
+  WSL, runner como serviço e boot automático, está em **`SETUP-WSL.md`** na raiz do repositório.
 
 ## Variáveis
 
 | Variável | Default | Descrição |
 | -------- | ------- | ---------- |
-| `manage_microk8s` | `true` | Se `true`, o Terraform instala/habilita o microk8s (`cluster.tf`). Se `false`, só se conecta a um cluster já existente |
-| `microk8s_channel` | `1.31/stable` | Canal do snap do microk8s a instalar |
-| `microk8s_addons` | `["dns", "storage", "metrics-server"]` | Addons habilitados; `metrics-server` é obrigatório para o HPA (`k8s/base/hpa.yaml`) |
-| `kubeconfig_path` | `~/.kube/config` | Caminho do kubeconfig — destino de `microk8s config` quando `manage_microk8s = true`, ou caminho de um kubeconfig existente quando `false` |
+| `microk8s_channel` | `1.31/stable` | Canal do snap do microk8s instalado por `cluster.tf` quando o binário não existe |
+| `microk8s_addons` | `["dns", "storage", "metrics-server"]` | Addons garantidos a cada apply; `metrics-server` é obrigatório para o HPA (`k8s/base/hpa.yaml`) |
+| `kubeconfig_path` | `~/.kube/config` | Caminho do kubeconfig — destino de `microk8s config` em `cluster.tf` e fonte dos providers |
 | `kube_context` | `""` (context corrente) | Nome do context, se houver múltiplos clusters no kubeconfig |
 | `namespace` | `tech-challenge` | Namespace onde os recursos são criados |
 | `db_name` | `techbase` | Nome do banco PostgreSQL |
@@ -114,30 +90,32 @@ cp infra/terraform.tfvars.example infra/terraform.tfvars
 
 ```bash
 cd infra
-terraform init
+terraform init -backend-config="path=$HOME/.local/state/tech-challenge/terraform.tfstate"
 terraform plan -var-file=terraform.tfvars
 terraform apply -var-file=terraform.tfvars
 ```
 
-## Estado compartilhado pelo CI
+## Estado do Terraform (backend local)
 
-O estado do Terraform fica no backend Kubernetes, armazenado em um Secret no namespace
-`default`. Assim, o runner self-hosted, o CI e as execuções locais usam o mesmo estado. O
-arquivo `terraform.tfstate` local continua ignorado pelo Git.
+O state usa o backend `local` num caminho **fora do diretório de checkout**
+(`$HOME/.local/state/tech-challenge/terraform.tfstate`), passado no `terraform init` via
+`-backend-config`. Ele não pode mais viver dentro do cluster (backend `kubernetes`): agora
+`cluster.tf` provisiona o microk8s quando ele não existe, e o `terraform init` roda **antes** do
+`apply` — numa máquina limpa não haveria cluster para guardar o state.
 
-Na primeira configuração, migre o estado local existente para o backend. Execute este comando
-uma única vez no ambiente que contém o `infra/terraform.tfstate` atual:
+No runner self-hosted persistente, esse arquivo sobrevive entre execuções. O CI usa o mesmo
+caminho (ver `.github/workflows/ci-cd.yml`). Para partilhar state entre máquinas diferentes,
+troque para um backend remoto (`s3`, `gcs`, `azurerm`) via `-backend-config`.
+
+Se você tinha state no antigo backend Kubernetes, migre uma única vez:
 
 ```bash
 cd infra
-terraform init -migrate-state -force-copy
-terraform plan -var-file=terraform.tfvars
+terraform init -migrate-state -force-copy \
+  -backend-config="path=$HOME/.local/state/tech-challenge/terraform.tfstate"
 ```
 
-Confirme que o plano não tenta adicionar os recursos já existentes antes de executar o `apply`.
-O backend cria um Secret com nome no formato `tfstate-default-tech-challenge`.
-
-Se o estado local não estiver disponível, importe os recursos existentes antes do primeiro
+Se não houver state anterior e os recursos já existirem no cluster, importe-os antes do primeiro
 `apply`:
 
 ```bash
@@ -182,7 +160,7 @@ Acesse `http://localhost:8025`.
 
 | Output | Descrição |
 | ------ | --------- |
-| `cluster_managed_by_terraform` | `true` se o microk8s foi instalado/habilitado por este módulo |
+| `cluster_managed_by_terraform` | Sempre `true` — `cluster.tf` valida/provisiona o microk8s a cada apply |
 | `namespace` | Namespace provisionado |
 | `postgres_service` | Nome do Service do PostgreSQL (`postgres`) |
 | `postgres_port` | Porta do PostgreSQL (`5432`) |
@@ -202,6 +180,7 @@ terraform destroy -var-file=terraform.tfvars
 ```
 
 Isso remove namespace, PostgreSQL, Redis e Mailpit do cluster. **Não desinstala o microk8s** — o
-`null_resource.microk8s` só instala/habilita (é deliberadamente sem efeito no `destroy`, para não
-arriscar remover o cluster e seu estado por engano). Para desinstalar o microk8s, faça manualmente
-com `sudo snap remove microk8s`.
+`null_resource.microk8s` só instala/valida no `apply` e é deliberadamente sem efeito no
+`destroy`, para não arriscar remover o cluster e seu estado por engano. Para desinstalar o
+microk8s (por exemplo, para provar o provisionamento do zero pelo CI), faça manualmente com
+`sudo snap remove microk8s --purge` — ver `SETUP-WSL.md`.

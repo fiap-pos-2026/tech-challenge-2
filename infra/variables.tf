@@ -1,17 +1,11 @@
-variable "manage_microk8s" {
-  description = "Se true (default), o Terraform instala/habilita o microk8s local via null_resource (cluster.tf) antes de provisionar os demais recursos. Desligue para apontar para um cluster que já existe por outro meio (cloud gerenciado, cluster provisionado fora deste módulo) — o Terraform passa a só se conectar via kubeconfig_path."
-  type        = bool
-  default     = true
-}
-
 variable "microk8s_channel" {
-  description = "Canal do snap do microk8s a instalar quando manage_microk8s = true."
+  description = "Canal do snap do microk8s instalado por cluster.tf quando o binário não existe no host."
   type        = string
   default     = "1.31/stable"
 }
 
 variable "microk8s_addons" {
-  description = "Addons do microk8s a habilitar quando manage_microk8s = true. metrics-server é obrigatório para o HPA (k8s/base/hpa.yaml) calcular utilização de CPU/memória."
+  description = "Addons do microk8s garantidos por cluster.tf a cada apply (idempotente). metrics-server é obrigatório para o HPA (k8s/base/hpa.yaml) calcular utilização de CPU/memória."
   type        = list(string)
   default     = ["dns", "storage", "metrics-server"]
 }

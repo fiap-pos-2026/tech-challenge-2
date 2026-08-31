@@ -1,24 +1,30 @@
 # Provisionamento do cluster Kubernetes local (microk8s) exigido pelo Tech Challenge
 # ("Criar scripts em Terraform para provisionamento do cluster Kubernetes — local ou cloud").
 #
-# Abordagem: microk8s roda como serviço snap no host (WSL2/Ubuntu), então o Terraform não pode
-# criá-lo com o provider "kubernetes" (que já pressupõe um cluster respondendo). Em vez disso,
-# um null_resource com local-exec instala e habilita o microk8s de forma idempotente — script
-# só age quando algo realmente falta — e escreve o kubeconfig que os providers kubernetes/helm
-# (providers.tf) consomem em seguida via depends_on.
+# Não há mais flag para ligar/desligar (o antigo `manage_microk8s`). A cada `terraform apply`
+# este recurso VALIDA o ambiente e age apenas no que falta:
+#   1. instala o microk8s (snap) se o binário não existir no host;
+#   2. sobe o cluster se ele não estiver respondendo;
+#   3. garante os addons exigidos pela app (o `microk8s enable` é idempotente);
+#   4. (re)escreve o kubeconfig que os providers kubernetes/helm (providers.tf) consomem a
+#      seguir via depends_on.
 #
-# Para apontar para um cluster que já existe por outro meio (cloud gerenciado, cluster do CI
-# provisionado por outra pipeline, etc.), desligue com manage_microk8s = false: o Terraform passa
-# a só se conectar ao kubeconfig existente, sem tentar instalar nada — cobrindo a opção "cloud" do
-# mesmo requisito sem duplicar módulos.
+# Ou seja: se o cluster já existe, todos os passos viram no-op; se não existe, ele é criado —
+# "se não existir cluster, cria". Como o local-exec não é interativo (no CI menos ainda), os
+# comandos `sudo` abaixo exigem sudo SEM SENHA para snap/microk8s/usermod no host do runner —
+# ver SETUP-WSL.md na raiz do repositório.
+#
+# Para usar um cluster gerenciado na cloud (EKS/GKE/AKS), substitua este arquivo pelo módulo do
+# provider correspondente e aponte kubeconfig_path/kube_context para o kubeconfig desse cluster;
+# o restante do módulo (main.tf) não muda.
 
 resource "null_resource" "microk8s" {
-  count = var.manage_microk8s ? 1 : 0
-
+  # Reexecuta o provisioner em todo apply: o script é idempotente e rápido quando o cluster já
+  # está pronto, e assim um cluster parado ou removido é reconstruído sem intervenção manual.
   triggers = {
-    # Reexecuta o provisioner se a lista de addons mudar; instalação em si é idempotente
-    # (o script confere o que já está pronto antes de agir).
-    addons = join(",", var.microk8s_addons)
+    always_run = timestamp()
+    addons     = join(",", var.microk8s_addons)
+    channel    = var.microk8s_channel
   }
 
   provisioner "local-exec" {
@@ -26,25 +32,37 @@ resource "null_resource" "microk8s" {
     command     = <<-EOT
       set -euo pipefail
 
+      KUBECONFIG_PATH="${pathexpand(var.kubeconfig_path)}"
+
+      # 1. Instala o microk8s se ainda não houver binário no host.
       if ! command -v microk8s >/dev/null 2>&1; then
-        echo "[microk8s] não encontrado — instalando via snap..."
+        echo "[microk8s] não encontrado — instalando via snap (canal ${var.microk8s_channel})..."
         sudo snap install microk8s --classic --channel=${var.microk8s_channel}
-        sudo usermod -aG microk8s "$USER"
+        sudo usermod -aG microk8s "$(id -un)"
       else
-        echo "[microk8s] já instalado — pulando snap install."
+        echo "[microk8s] binário já presente — pulando instalação."
       fi
 
-      echo "[microk8s] aguardando cluster ficar pronto..."
-      sudo microk8s status --wait-ready --timeout 180
+      # 2. Garante que o cluster está no ar. Só age se ele não ficar pronto em 30s.
+      if ! sudo microk8s status --wait-ready --timeout 30 >/dev/null 2>&1; then
+        echo "[microk8s] cluster não está respondendo — inicializando..."
+        sudo microk8s start || true
+        sudo microk8s status --wait-ready --timeout 300
+      else
+        echo "[microk8s] cluster já está pronto."
+      fi
 
+      # 3. Garante os addons exigidos pela app (metrics-server é obrigatório para o HPA).
       for addon in ${join(" ", var.microk8s_addons)}; do
-        echo "[microk8s] habilitando addon: $addon"
+        echo "[microk8s] garantindo addon: $addon"
         sudo microk8s enable "$addon"
       done
 
-      mkdir -p "$(dirname ${var.kubeconfig_path})"
-      sudo microk8s config > ${var.kubeconfig_path}
-      echo "[microk8s] kubeconfig escrito em ${var.kubeconfig_path}"
+      # 4. (Re)escreve o kubeconfig consumido pelos providers kubernetes/helm.
+      mkdir -p "$(dirname "$KUBECONFIG_PATH")"
+      sudo microk8s config > "$KUBECONFIG_PATH"
+      chmod 600 "$KUBECONFIG_PATH"
+      echo "[microk8s] kubeconfig escrito em $KUBECONFIG_PATH"
     EOT
   }
 }
