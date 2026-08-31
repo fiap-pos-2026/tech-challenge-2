@@ -309,6 +309,20 @@ Crie os Secrets do repositório em **Settings → Secrets and variables → Acti
 |---|---|
 | `TF_VAR_DB_PASSWORD` | Mesma senha usada pelo PostgreSQL (`db_password`) |
 | `GHCR_PULL_TOKEN` | PAT com escopo `read:packages` no namespace `ghcr.io/<owner-do-repo>`. O job `terraform-apply` o passa como `TF_VAR_ghcr_pull_token`, e o Terraform cria o Secret `ghcr-pull` no namespace para o microk8s baixar a imagem privada. Só necessário se o pacote for privado |
+| `JWT_PUBLIC_KEY` *(opcional)* | PEM completo da chave pública JWT. Se ausente, o `deploy` usa `core/src/main/resources/certs/dev-public.pem` do repo |
+| `JWT_PRIVATE_KEY` *(opcional)* | PEM completo da chave privada JWT. Se ausente, usa `core/src/main/resources/certs/dev-private.pem`. Defina os dois para produção — **não use as chaves `dev-*` fora de dev** |
+
+O job `deploy` monta o Secret `tech-challenge-core-secret` no cluster automaticamente: `jwt-*`
+dos GitHub Secrets acima **ou** das chaves `dev-*` versionadas no repo; `jdbc-*` lidos do Secret
+`postgres-credentials` que o Terraform criou; `mail-*` vazios (Mailpit). É idempotente — roda a
+cada deploy. **Para o desafio não precisa configurar nada** — as chaves `dev-*` do repo bastam.
+
+Para produção, defina os dois com o `gh` CLI (a partir de chaves suas, não as `dev-*`):
+
+```bash
+gh secret set JWT_PUBLIC_KEY  --repo fiap-pos-2026/tech-challenge-2 < caminho/public.pem
+gh secret set JWT_PRIVATE_KEY --repo fiap-pos-2026/tech-challenge-2 < caminho/private.pem
+```
 
 Antes do primeiro workflow, migre o estado do Terraform para o backend `local` seguindo o
 procedimento em [`infra/README.md`](infra/README.md#estado-do-terraform-backend-local). Sem essa

@@ -140,6 +140,46 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Secret da app (chaves JWT + credenciais). O Kustomize NÃO versiona esse Secret e o
+      # Terraform também não o cria. Montamos aqui, idempotente:
+      #  - jdbc-* saem do Secret `postgres-credentials` que o Terraform criou (garante que
+      #    batem com o Postgres provisionado);
+      #  - jwt-* vêm dos GitHub Secrets JWT_PUBLIC_KEY / JWT_PRIVATE_KEY se definidos; senão
+      #    caem para as chaves de desenvolvimento versionadas no repo (ok para o desafio);
+      #  - mail-* ficam vazios (Mailpit não exige auth).
+      - name: Ensure app secret (tech-challenge-core-secret)
+        shell: bash
+        env:
+          JWT_PUBLIC_KEY: ${{ secrets.JWT_PUBLIC_KEY }}
+          JWT_PRIVATE_KEY: ${{ secrets.JWT_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          ns=tech-challenge
+
+          jdbc_user=$(kubectl -n "$ns" get secret postgres-credentials -o jsonpath='{.data.POSTGRES_USER}' | base64 -d)
+          jdbc_pass=$(kubectl -n "$ns" get secret postgres-credentials -o jsonpath='{.data.POSTGRES_PASSWORD}' | base64 -d)
+
+          tmp=$(mktemp -d)
+          trap 'rm -rf "$tmp"' EXIT
+          if [ -n "${JWT_PUBLIC_KEY:-}" ] && [ -n "${JWT_PRIVATE_KEY:-}" ]; then
+            echo "chaves JWT: usando GitHub Secrets"
+            printf '%s\n' "$JWT_PUBLIC_KEY"  > "$tmp/public.pem"
+            printf '%s\n' "$JWT_PRIVATE_KEY" > "$tmp/private.pem"
+          else
+            echo "chaves JWT: usando core/src/main/resources/certs/dev-*.pem do repo"
+            cp core/src/main/resources/certs/dev-public.pem  "$tmp/public.pem"
+            cp core/src/main/resources/certs/dev-private.pem "$tmp/private.pem"
+          fi
+
+          kubectl -n "$ns" create secret generic tech-challenge-core-secret \
+            --from-literal=jdbc-username="$jdbc_user" \
+            --from-literal=jdbc-password="$jdbc_pass" \
+            --from-literal=mail-username="noreply@tech.local" \
+            --from-literal=mail-password="" \
+            --from-file=jwt-public-key="$tmp/public.pem" \
+            --from-file=jwt-private-key="$tmp/private.pem" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
       - name: Render and apply Kustomize overlay
         shell: bash
         run: |

@@ -22,11 +22,14 @@ overlay para a tag SHA exata publicada no run, qualquer que seja o owner.
 
 1. Namespace `tech-challenge` e as dependências (PostgreSQL, Redis e Mailpit)
    provisionados pelo Terraform — ver `/infra`.
-2. Secret `tech-challenge-core-secret` criado fora do Git.
+2. Secret `tech-challenge-core-secret` (chaves JWT + credenciais JDBC/mail).
 3. Addons `dns`, `hostpath-storage` e `metrics-server` habilitados.
 
-Depois do `terraform apply`, crie o Secret da aplicação a partir da raiz do
-repositório:
+**No CI** o job `deploy` cria o Secret `tech-challenge-core-secret` automaticamente, a partir
+dos GitHub Secrets `JWT_PUBLIC_KEY`/`JWT_PRIVATE_KEY` e das credenciais JDBC lidas do Secret
+`postgres-credentials` (criado pelo Terraform).
+
+**Localmente** (`kubectl apply -k` à mão), crie-o depois do `terraform apply`, da raiz do repo:
 
 ```bash
 kubectl -n tech-challenge create secret generic tech-challenge-core-secret \
