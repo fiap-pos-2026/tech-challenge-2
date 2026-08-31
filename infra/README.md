@@ -9,7 +9,7 @@ ou cloud)": o cluster em si (`cluster.tf`) e o banco de dados (`main.tf`).
 
 | Recurso | Tipo Terraform | Nome no cluster | Observação |
 | ------- | -------------- | ---------------- | ---------- |
-| Cluster Kubernetes | `null_resource` + `local-exec` (`cluster.tf`) | microk8s (serviço snap no host) | A cada apply valida o ambiente: instala o snap se ausente, sobe o cluster se parado, garante os addons `dns`/`storage`/`metrics-server` e (re)gera o kubeconfig. Idempotente — pula o que já está pronto. Não há flag para desligar; para cloud, ver abaixo |
+| Cluster Kubernetes | `null_resource` + `local-exec` (`cluster.tf`) | microk8s (serviço snap no host) | A cada apply valida o ambiente: instala o snap se ausente, sobe o cluster se parado, garante os addons `dns`/`hostpath-storage`/`metrics-server` e (re)gera o kubeconfig. Idempotente — pula o que já está pronto. Não há flag para desligar; para cloud, ver abaixo |
 | Namespace da aplicação | `kubernetes_namespace` | `tech-challenge` (var `namespace`) | Mesmo namespace usado pelo Kustomize em `/k8s` |
 | Credenciais do PostgreSQL | `kubernetes_secret` | `postgres-credentials` | `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` |
 | Pull da imagem privada no GHCR | `kubernetes_secret` (`kubernetes.io/dockerconfigjson`) | `ghcr-pull` | Criado só quando `ghcr_pull_token` é fornecido; referenciado por `imagePullSecrets` em `k8s/base/deployment.yaml`. No CI vem do secret `GHCR_PULL_TOKEN` (PAT `read:packages`) |
@@ -66,7 +66,7 @@ senha.
 | Variável | Default | Descrição |
 | -------- | ------- | ---------- |
 | `microk8s_channel` | `1.31/stable` | Canal do snap do microk8s instalado por `cluster.tf` quando o binário não existe |
-| `microk8s_addons` | `["dns", "storage", "metrics-server"]` | Addons garantidos a cada apply; `metrics-server` é obrigatório para o HPA (`k8s/base/hpa.yaml`) |
+| `microk8s_addons` | `["dns", "hostpath-storage", "metrics-server"]` | Addons garantidos a cada apply; `metrics-server` é obrigatório para o HPA (`k8s/base/hpa.yaml`) |
 | `kubeconfig_path` | `~/.kube/config` | Caminho do kubeconfig — destino de `microk8s config` em `cluster.tf` e fonte dos providers |
 | `kube_context` | `""` (context corrente) | Nome do context, se houver múltiplos clusters no kubeconfig |
 | `namespace` | `tech-challenge` | Namespace onde os recursos são criados |

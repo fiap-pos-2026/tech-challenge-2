@@ -23,7 +23,7 @@ overlay para a tag SHA exata publicada no run, qualquer que seja o owner.
 1. Namespace `tech-challenge` e as dependências (PostgreSQL, Redis e Mailpit)
    provisionados pelo Terraform — ver `/infra`.
 2. Secret `tech-challenge-core-secret` criado fora do Git.
-3. Addons `dns`, `storage` e `metrics-server` habilitados.
+3. Addons `dns`, `hostpath-storage` e `metrics-server` habilitados.
 
 Depois do `terraform apply`, crie o Secret da aplicação a partir da raiz do
 repositório:

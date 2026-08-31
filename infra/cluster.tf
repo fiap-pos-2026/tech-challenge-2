@@ -32,37 +32,55 @@ resource "null_resource" "microk8s" {
     command     = <<-EOT
       set -euo pipefail
 
+      # O shell do runner é `bash --noprofile --norc`, que não carrega /etc/profile —
+      # garante /snap/bin no PATH para achar `snap` e `microk8s` sem depender disso.
+      export PATH="$PATH:/snap/bin"
+
       KUBECONFIG_PATH="${pathexpand(var.kubeconfig_path)}"
 
       # 1. Instala o microk8s se ainda não houver binário no host.
       if ! command -v microk8s >/dev/null 2>&1; then
         echo "[microk8s] não encontrado — instalando via snap (canal ${var.microk8s_channel})..."
         sudo snap install microk8s --classic --channel=${var.microk8s_channel}
-        sudo usermod -aG microk8s "$(id -un)"
+        sudo usermod -aG microk8s "$(id -un)" || true
       else
         echo "[microk8s] binário já presente — pulando instalação."
+        # `snap start` (nível systemd) em vez de `microk8s start`, que chama snapctl e
+        # falha fora do contexto do snap em alguns ambientes. Idempotente.
+        sudo snap start microk8s >/dev/null 2>&1 || true
       fi
 
-      # 2. Garante que o cluster está no ar. Só age se ele não ficar pronto em 30s.
-      if ! sudo microk8s status --wait-ready --timeout 30 >/dev/null 2>&1; then
-        echo "[microk8s] cluster não está respondendo — inicializando..."
-        sudo microk8s start || true
-        sudo microk8s status --wait-ready --timeout 300
-      else
-        echo "[microk8s] cluster já está pronto."
-      fi
+      # 2. Espera o cluster ficar realmente pronto. Recém-instalado leva ~1-2 min.
+      sudo microk8s status --wait-ready --timeout 300
 
-      # 3. Garante os addons exigidos pela app (metrics-server é obrigatório para o HPA).
-      for addon in ${join(" ", var.microk8s_addons)}; do
-        echo "[microk8s] garantindo addon: $addon"
-        sudo microk8s enable "$addon"
+      # 3. Garante os addons (uma chamada só; `enable` é idempotente). Logo após o install a
+      #    habilitação pode falhar de forma transitória — tenta de novo sem abortar o script.
+      for attempt in 1 2 3; do
+        if sudo microk8s enable ${join(" ", var.microk8s_addons)}; then
+          break
+        fi
+        echo "[microk8s] 'enable' falhou (tentativa $attempt/3) — aguardando cluster e repetindo..."
+        sudo microk8s status --wait-ready --timeout 120 || true
+        sleep 10
       done
 
-      # 4. (Re)escreve o kubeconfig consumido pelos providers kubernetes/helm.
+      # 4. (Re)escreve o kubeconfig consumido pelos providers kubernetes/helm. O cluster-agent
+      #    ainda pode estar subindo logo após habilitar addons, então tenta até vir um arquivo
+      #    válido em vez de morrer no primeiro código != 0.
       mkdir -p "$(dirname "$KUBECONFIG_PATH")"
-      sudo microk8s config > "$KUBECONFIG_PATH"
-      chmod 600 "$KUBECONFIG_PATH"
-      echo "[microk8s] kubeconfig escrito em $KUBECONFIG_PATH"
+      for attempt in $(seq 1 30); do
+        if sudo microk8s config > "$KUBECONFIG_PATH.tmp" 2>/dev/null && grep -q 'server:' "$KUBECONFIG_PATH.tmp"; then
+          mv "$KUBECONFIG_PATH.tmp" "$KUBECONFIG_PATH"
+          chmod 600 "$KUBECONFIG_PATH"
+          echo "[microk8s] kubeconfig escrito em $KUBECONFIG_PATH"
+          exit 0
+        fi
+        echo "[microk8s] aguardando kubeconfig ($attempt/30)..."
+        sleep 5
+      done
+
+      echo "[microk8s] ERRO: kubeconfig não ficou pronto a tempo" >&2
+      exit 1
     EOT
   }
 }

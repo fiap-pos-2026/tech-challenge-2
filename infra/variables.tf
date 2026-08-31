@@ -7,7 +7,8 @@ variable "microk8s_channel" {
 variable "microk8s_addons" {
   description = "Addons do microk8s garantidos por cluster.tf a cada apply (idempotente). metrics-server é obrigatório para o HPA (k8s/base/hpa.yaml) calcular utilização de CPU/memória."
   type        = list(string)
-  default     = ["dns", "storage", "metrics-server"]
+  # hostpath-storage (não `storage`, que está deprecado e só faz alias para ele).
+  default     = ["dns", "hostpath-storage", "metrics-server"]
 }
 
 variable "namespace" {

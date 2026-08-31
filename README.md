@@ -158,7 +158,7 @@ fora do Git, porque contém a senha do banco, as credenciais SMTP e as chaves JW
 - **Docker** e **Docker Compose** (recomendado para execução local)
 - **JDK 25** e **Gradle** (para execução local sem Docker)
 - **microk8s** no WSL2 com `kubectl` e Kustomize — para deploy em Kubernetes
-- Addons microk8s `dns`, `storage` e `metrics-server`
+- Addons microk8s `dns`, `hostpath-storage` e `metrics-server`
 - **Terraform** ≥ 1.6 — para provisionar recursos via `/infra`
 - Repositório GitHub com Actions habilitado — para validar o CI/CD
 
@@ -214,7 +214,7 @@ quando `ghcr_pull_token` é informado:
 ```bash
 # 1. Verifique o cluster e habilite os addons necessários
 microk8s status --wait-ready
-microk8s enable dns storage metrics-server
+microk8s enable dns hostpath-storage metrics-server
 microk8s kubectl get nodes
 
 # 2. Provisione namespace, PostgreSQL, Redis e Mailpit
