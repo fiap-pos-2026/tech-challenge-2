@@ -12,7 +12,7 @@ ou cloud)": o cluster em si (`cluster.tf`) e o banco de dados (`main.tf`).
 | Cluster Kubernetes | `null_resource` + `local-exec` (`cluster.tf`) | microk8s (serviço snap no host) | A cada apply valida o ambiente: instala o snap se ausente, sobe o cluster se parado, garante os addons `dns`/`storage`/`metrics-server` e (re)gera o kubeconfig. Idempotente — pula o que já está pronto. Não há flag para desligar; para cloud, ver abaixo |
 | Namespace da aplicação | `kubernetes_namespace` | `tech-challenge` (var `namespace`) | Mesmo namespace usado pelo Kustomize em `/k8s` |
 | Credenciais do PostgreSQL | `kubernetes_secret` | `postgres-credentials` | `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` |
-| Pull da imagem privada no GHCR | `kubernetes_secret` (`kubernetes.io/dockerconfigjson`) | `ghcr-pull` | Criado só quando `ghcr_pull_token` é fornecido; referenciado por `imagePullSecrets` em `k8s/base/deployment.yaml`. No CI vem do secret `GHCR_PULL_PAT` |
+| Pull da imagem privada no GHCR | `kubernetes_secret` (`kubernetes.io/dockerconfigjson`) | `ghcr-pull` | Criado só quando `ghcr_pull_token` é fornecido; referenciado por `imagePullSecrets` em `k8s/base/deployment.yaml`. No CI vem do secret `GHCR_PULL_TOKEN` (PAT `read:packages`) |
 | Banco de dados | `kubernetes_stateful_set` + `kubernetes_service` | `postgres` | Imagem `postgres:18.4-alpine` (mesma do `docker-compose.yml`); volume persistente |
 | Cache / rate limiting | `kubernetes_deployment` + `kubernetes_service` | `redis` | Imagem `redis:7-alpine` (mesma do `docker-compose.yml`); sem senha, sem persistência (`--save ""`) |
 | E-mail local | `kubernetes_deployment` + `kubernetes_service` | `mailpit` | Imagem `axllent/mailpit:latest`; SMTP na porta `1025` e interface web na `8025` |
@@ -76,8 +76,8 @@ senha.
 | `postgres_image` | `postgres:18.4-alpine` | Imagem do PostgreSQL |
 | `postgres_storage_size` | `2Gi` | Tamanho do volume persistente do PostgreSQL |
 | `redis_image` | `redis:7-alpine` | Imagem do Redis |
-| `ghcr_username` | `johncgo` | Owner do pacote da imagem no GHCR; vira `docker-username` no Secret `ghcr-pull` |
-| `ghcr_pull_token` | *(vazio)* | Token GitHub com escopo `read:packages`. Vazio = não cria o Secret `ghcr-pull` (imagem pública ou build local). No CI vem de `TF_VAR_ghcr_pull_token` (secret `GHCR_PULL_PAT`); nunca commitar o valor real |
+| `ghcr_username` | `johncgo` | Owner do pacote da imagem no GHCR; vira `docker-username` no Secret `ghcr-pull`. No CI vem de `TF_VAR_ghcr_username = github.repository_owner`; o default cobre só execuções locais |
+| `ghcr_pull_token` | *(vazio)* | Token GitHub com escopo `read:packages`. Vazio = não cria o Secret `ghcr-pull` (imagem pública ou build local). No CI vem de `TF_VAR_ghcr_pull_token` (secret `GHCR_PULL_TOKEN`); nunca commitar o valor real |
 
 Copie o exemplo e ajuste os valores reais (o arquivo `terraform.tfvars` é ignorado pelo git):
 

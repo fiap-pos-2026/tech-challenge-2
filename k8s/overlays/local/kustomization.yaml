@@ -4,6 +4,9 @@ kind: Kustomization
 resources:
   - ../../base
 
+# No CI, o job `deploy` substitui esta linha pela imagem exata publicada no run
+# (ghcr.io/<owner-do-repo>/tech-challenge-core:<sha>). O valor abaixo é só o default
+# para `kubectl apply -k` manual — ajuste para o seu namespace do GHCR se necessário.
 images:
   - name: tech-challenge-core
     newName: ghcr.io/johncgo/tech-challenge-core

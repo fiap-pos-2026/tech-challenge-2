@@ -53,7 +53,7 @@ variable "redis_image" {
 }
 
 variable "ghcr_username" {
-  description = "Owner do pacote da imagem no GHCR. Usado como docker-username no Secret ghcr-pull."
+  description = "Owner do pacote da imagem no GHCR (docker-username no Secret ghcr-pull). No CI vem de TF_VAR_ghcr_username = github.repository_owner; o default cobre apenas execuções locais."
   type        = string
   default     = "johncgo"
 }

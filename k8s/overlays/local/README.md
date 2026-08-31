@@ -8,12 +8,15 @@ Registry (GHCR) e o Service exposto via NodePort.
 | Item | Valor |
 | ---- | ----- |
 | Registry | `ghcr.io` |
-| Imagem | `ghcr.io/fiap-pos-2026/tech-challenge-core` |
+| Imagem | `ghcr.io/<owner-do-repositório>/tech-challenge-core` (o `newName` neste overlay é só o default local) |
 | Tag do CI/CD | SHA do commit |
 | Tag manual | `latest` |
 
-O pacote `fiap-pos-2026/tech-challenge-core` precisa estar público no GHCR. O workflow de CI/CD
-publica automaticamente uma tag imutável com o SHA do commit e atualiza a tag `latest`.
+O workflow publica em `ghcr.io/${{ github.repository_owner }}/tech-challenge-core` autenticado
+pelo `GITHUB_TOKEN` (o namespace casa com o owner do repo, então não precisa de PAT). O pacote é
+**privado**: o microk8s puxa a imagem com o Secret `ghcr-pull` (provisionado pelo Terraform a
+partir do PAT `GHCR_PULL_TOKEN`). O job `deploy` reescreve a linha `image:` renderizada pelo
+overlay para a tag SHA exata publicada no run, qualquer que seja o owner.
 
 ## Pré-requisitos no cluster
 
@@ -40,9 +43,9 @@ kubectl -n tech-challenge create secret generic tech-challenge-core-secret \
 ```bash
 kubectl kustomize k8s/overlays/local     # revisa o resultado
 kubectl apply -k k8s/overlays/local
-# Para uma execução manual, use a tag publicada desejada.
+# Para uma execução manual, use a tag publicada desejada (ajuste o owner do seu GHCR).
 kubectl -n tech-challenge set image deployment/core \
-  core=ghcr.io/fiap-pos-2026/tech-challenge-core:latest
+  core=ghcr.io/<owner>/tech-challenge-core:latest
 kubectl -n tech-challenge rollout status deployment/core --timeout=180s
 ```
 

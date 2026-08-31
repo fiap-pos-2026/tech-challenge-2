@@ -205,10 +205,11 @@ Swagger UI disponível em: `http://localhost:8080/core/swagger-ui.html`
 ### Kubernetes local (microk8s + Kustomize)
 
 Manifests em `/k8s`, organizados em `base` (Deployment, Service, ConfigMap, Secret de exemplo, HPA) e
-overlay `local` (imagem do GHCR, NodePort, requests reduzidos para o nó único do WSL2). A imagem
-`ghcr.io/johncgo/tech-challenge-core` é privada e publicada pelo workflow de CI/CD; o cluster a baixa
-autenticado via Secret `ghcr-pull` (`imagePullSecrets` em `k8s/base/deployment.yaml`), provisionado
-pelo Terraform quando `ghcr_pull_token` é informado:
+overlay `local` (imagem do GHCR, NodePort, requests reduzidos para o nó único do WSL2). O workflow
+de CI/CD publica a imagem em `ghcr.io/<owner-do-repositório>/tech-challenge-core` (namespace
+derivado de `github.repository_owner`); o pacote é privado e o cluster o baixa autenticado via
+Secret `ghcr-pull` (`imagePullSecrets` em `k8s/base/deployment.yaml`), provisionado pelo Terraform
+quando `ghcr_pull_token` é informado:
 
 ```bash
 # 1. Verifique o cluster e habilite os addons necessários
@@ -239,9 +240,9 @@ kubectl -n tech-challenge create secret generic tech-challenge-core-secret \
 kubectl kustomize k8s/overlays/local
 kubectl apply -k k8s/overlays/local
 
-# 5. Em uma execução manual, fixe a tag publicada desejada
+# 5. Em uma execução manual, fixe a tag publicada desejada (ajuste o owner do seu GHCR)
 kubectl -n tech-challenge set image deployment/core \
-  core=ghcr.io/johncgo/tech-challenge-core:latest
+  core=ghcr.io/<owner>/tech-challenge-core:latest
 ```
 
 A aplicação responde em `http://<ip-do-node>:30080/core`. Para descobrir o IP do
@@ -307,17 +308,20 @@ Crie os Secrets do repositório em **Settings → Secrets and variables → Acti
 | Secret | Valor |
 |---|---|
 | `TF_VAR_DB_PASSWORD` | Mesma senha usada pelo PostgreSQL (`db_password`) |
-| `GHCR_PULL_PAT` | PAT do GitHub com escopo `read:packages`. O job `terraform-apply` o passa como `TF_VAR_ghcr_pull_token`, e o Terraform cria o Secret `ghcr-pull` no namespace para o microk8s baixar a imagem privada |
+| `GHCR_PULL_TOKEN` | PAT com escopo `read:packages` no namespace `ghcr.io/<owner-do-repo>`. O job `terraform-apply` o passa como `TF_VAR_ghcr_pull_token`, e o Terraform cria o Secret `ghcr-pull` no namespace para o microk8s baixar a imagem privada. Só necessário se o pacote for privado |
 
-Antes do primeiro workflow, migre o estado local do Terraform para o backend Kubernetes seguindo
-o procedimento em [`infra/README.md`](infra/README.md#estado-compartilhado-pelo-ci). Sem essa
+Antes do primeiro workflow, migre o estado do Terraform para o backend `local` seguindo o
+procedimento em [`infra/README.md`](infra/README.md#estado-do-terraform-backend-local). Sem essa
 migração, o CI não reconhece recursos criados manualmente e tenta recriá-los.
 
-O workflow usa o `GITHUB_TOKEN` para publicar no GHCR. Em **Settings → Actions → General**,
-confirme que o repositório permite que workflows criem e publiquem pacotes. O pacote
-`tech-challenge-core` permanece **privado**: o microk8s faz o pull autenticado pelo Secret
-`ghcr-pull` (provisionado pelo Terraform a partir de `GHCR_PULL_PAT`), então não é preciso
-tornar o pacote público.
+O job `docker-image` publica no GHCR autenticado pelo **`GITHUB_TOKEN`** automático — funciona
+sem PAT porque `IMAGE_NAME` usa `ghcr.io/${{ github.repository_owner }}/...`, ou seja, o
+namespace sempre casa com o owner do repositório que roda o workflow (o mesmo workflow serve o
+repo do org e um fork). Em **Settings → Actions → General**, confirme que o repositório permite
+que workflows criem e publiquem pacotes. O pacote `tech-challenge-core` fica **privado**: o
+microk8s faz o pull autenticado pelo Secret `ghcr-pull` (provisionado pelo Terraform a partir de
+`GHCR_PULL_TOKEN`). Se preferir, torne o pacote **público** e o `GHCR_PULL_TOKEN` deixa de ser
+necessário.
 
 #### Gatilhos do workflow
 
@@ -334,7 +338,7 @@ build-and-test → docker-image → terraform-apply → deploy
 ```
 
 O job `docker-image` publica as tags `latest` e o SHA do commit em
-`ghcr.io/fiap-pos-2026/tech-challenge-core`. O deploy fixa o Deployment na tag SHA, garantindo
+`ghcr.io/<owner-do-repositório>/tech-challenge-core`. O deploy fixa o Deployment na tag SHA, garantindo
 que o cluster execute a mesma imagem validada no job de build. Qualquer falha em build, testes,
 imagem ou Terraform bloqueia os estágios seguintes.
 

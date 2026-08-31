@@ -19,7 +19,11 @@ permissions:
   packages: write
 
 env:
-  IMAGE_NAME: ghcr.io/johncgo/tech-challenge-core
+  # Namespace do GHCR = owner do repositório que está rodando o workflow. Assim o mesmo
+  # workflow publica em ghcr.io/fiap-pos-2026/... no repo do org e em ghcr.io/johncgo/... num
+  # fork, sempre casando com o escopo do GITHUB_TOKEN — sem PAT e sem owner fixo no arquivo.
+  # (github.repository_owner precisa estar em minúsculas, o que já é o caso aqui.)
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/tech-challenge-core
 
 jobs:
   # Build + testes automatizados em runner GitHub-hosted. Falha aqui bloqueia os
@@ -66,6 +70,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Como IMAGE_NAME usa github.repository_owner, o namespace sempre bate com o owner do repo
+      # e o GITHUB_TOKEN (permissions.packages: write) tem direito de publicar — sem PAT.
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
@@ -100,7 +106,11 @@ jobs:
         working-directory: infra
     env:
       TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
-      TF_VAR_ghcr_pull_token: ${{ secrets.GHCR_PULL_PAT }}
+      # Owner do pacote = owner do repo (mesmo namespace do push). O token é um PAT com
+      # read:packages nesse namespace — é credencial, então continua vindo de secret; só o
+      # username é derivado do contexto.
+      TF_VAR_ghcr_username: ${{ github.repository_owner }}
+      TF_VAR_ghcr_pull_token: ${{ secrets.GHCR_PULL_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -135,8 +145,10 @@ jobs:
         run: |
           set -euo pipefail
           image="${IMAGE_NAME}:${GITHUB_SHA}"
+          # Troca qualquer ghcr.io/<owner>/tech-challenge-core:<tag> renderizado pelo overlay
+          # pela imagem exata publicada neste run — independe do owner fixado no kustomization.
           kubectl kustomize k8s/overlays/local \
-            | sed "s|${IMAGE_NAME}:latest|${image}|g" \
+            | sed -E "s#image: ghcr\.io/[^:[:space:]]+/tech-challenge-core:[^[:space:]]+#image: ${image}#g" \
             | kubectl apply -f -
 
       - name: Wait for rollout
