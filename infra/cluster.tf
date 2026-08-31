@@ -64,23 +64,37 @@ resource "null_resource" "microk8s" {
         sleep 10
       done
 
-      # 4. (Re)escreve o kubeconfig consumido pelos providers kubernetes/helm. O cluster-agent
-      #    ainda pode estar subindo logo após habilitar addons, então tenta até vir um arquivo
-      #    válido em vez de morrer no primeiro código != 0.
+      # 4. Exporta o kubeconfig e só o aceita depois que uma chamada de API REAL com ele
+      #    passa. Nos primeiros minutos o microk8s regenera os certificados; um kubeconfig
+      #    capturado nessa janela faz o provider kubernetes falhar com "x509: unknown
+      #    authority". A validação usa `microk8s kubectl --kubeconfig` (não exige sudo além
+      #    do já liberado para o microk8s).
       mkdir -p "$(dirname "$KUBECONFIG_PATH")"
+
+      ok=0
       for attempt in $(seq 1 30); do
-        if sudo microk8s config > "$KUBECONFIG_PATH.tmp" 2>/dev/null && grep -q 'server:' "$KUBECONFIG_PATH.tmp"; then
-          mv "$KUBECONFIG_PATH.tmp" "$KUBECONFIG_PATH"
-          chmod 600 "$KUBECONFIG_PATH"
-          echo "[microk8s] kubeconfig escrito em $KUBECONFIG_PATH"
-          exit 0
+        if sudo microk8s config > "$KUBECONFIG_PATH.tmp" 2>/dev/null \
+           && grep -q 'certificate-authority-data' "$KUBECONFIG_PATH.tmp" \
+           && sudo microk8s kubectl --kubeconfig "$KUBECONFIG_PATH.tmp" get --raw='/readyz' >/dev/null 2>&1; then
+          ok=1
+          break
         fi
-        echo "[microk8s] aguardando kubeconfig ($attempt/30)..."
-        sleep 5
+        echo "[microk8s] kubeconfig ainda não valida ($attempt/30)..."
+        sleep 10
       done
 
-      echo "[microk8s] ERRO: kubeconfig não ficou pronto a tempo" >&2
-      exit 1
+      if [ "$ok" -ne 1 ]; then
+        echo "[microk8s] kubeconfig não validou — forçando refresh-certs..."
+        sudo microk8s refresh-certs --cert ca.crt || true
+        sudo microk8s refresh-certs --cert server.crt || true
+        sudo microk8s status --wait-ready --timeout 300
+        sudo microk8s config > "$KUBECONFIG_PATH.tmp"
+        sudo microk8s kubectl --kubeconfig "$KUBECONFIG_PATH.tmp" get --raw='/readyz' >/dev/null
+      fi
+
+      mv "$KUBECONFIG_PATH.tmp" "$KUBECONFIG_PATH"
+      chmod 600 "$KUBECONFIG_PATH"
+      echo "[microk8s] kubeconfig validado e escrito em $KUBECONFIG_PATH"
     EOT
   }
 }
