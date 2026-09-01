@@ -1,7 +1,7 @@
 package br.com.fiap.pos.tech_challenge.core.web.controller;
 
-import br.com.fiap.pos.tech_challenge.core.web.dto.ChangePasswordDTO;
-import br.com.fiap.pos.tech_challenge.core.web.dto.UserDTO;
+import br.com.fiap.pos.tech_challenge.core.application.dto.ChangePasswordDTO;
+import br.com.fiap.pos.tech_challenge.core.application.dto.UserDTO;
 import br.com.fiap.pos.tech_challenge.core.infrastructure.security.UserDetailsImpl;
 import br.com.fiap.pos.tech_challenge.core.application.UserService;
 import br.com.fiap.pos.tech_challenge.core.util.AuthUtility;

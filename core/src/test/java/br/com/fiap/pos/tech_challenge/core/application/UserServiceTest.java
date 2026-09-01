@@ -1,12 +1,12 @@
 package br.com.fiap.pos.tech_challenge.core.application;
 
-import br.com.fiap.pos.tech_challenge.core.web.dto.CreateUserDTO;
-import br.com.fiap.pos.tech_challenge.core.web.dto.UpdateUserDTO;
-import br.com.fiap.pos.tech_challenge.core.web.dto.UserDTO;
+import br.com.fiap.pos.tech_challenge.core.application.dto.CreateUserDTO;
+import br.com.fiap.pos.tech_challenge.core.application.dto.UpdateUserDTO;
+import br.com.fiap.pos.tech_challenge.core.application.dto.UserDTO;
 import br.com.fiap.pos.tech_challenge.core.domain.model.User;
 import br.com.fiap.pos.tech_challenge.core.domain.enums.UserRole;
 import br.com.fiap.pos.tech_challenge.core.domain.exception.CoreException;
-import br.com.fiap.pos.tech_challenge.core.web.mapper.UserMapper;
+import br.com.fiap.pos.tech_challenge.core.application.mapper.UserMapper;
 import br.com.fiap.pos.tech_challenge.core.application.port.out.UserRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,7 +15,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.core.userdetails.UserDetails;
 import br.com.fiap.pos.tech_challenge.core.application.port.out.CurrentActorPort;
 import br.com.fiap.pos.tech_challenge.core.application.port.out.PasswordHasher;
 
@@ -51,25 +50,6 @@ class UserServiceTest {
         admin.setId(999L);
         admin.setRole(UserRole.ADMIN);
         lenient().when(currentActorPort.currentUser()).thenReturn(Optional.of(admin));
-    }
-
-    @Test
-    void loadUserByUsername_returnsUserDetailsWhenFound() {
-        User user = user("atendente");
-        when(repository.findByLogin("atendente")).thenReturn(Optional.of(user));
-
-        UserDetails result = sut.loadUserByUsername("atendente");
-
-        assertThat(result).isNotNull();
-        assertThat(result.getUsername()).isEqualTo("atendente");
-    }
-
-    @Test
-    void loadUserByUsername_throwsWhenNotFound() {
-        when(repository.findByLogin("unknown")).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> sut.loadUserByUsername("unknown"))
-                .isInstanceOf(CoreException.class);
     }
 
     @Test
@@ -212,7 +192,7 @@ class UserServiceTest {
         when(passwordHasher.matches("novaSenha@1", "hash")).thenReturn(false);
         when(passwordHasher.hash("novaSenha@1")).thenReturn("newHash");
 
-        sut.changePassword(1L, new br.com.fiap.pos.tech_challenge.core.web.dto.ChangePasswordDTO("senhaAtual", "novaSenha@1"));
+        sut.changePassword(1L, new br.com.fiap.pos.tech_challenge.core.application.dto.ChangePasswordDTO("senhaAtual", "novaSenha@1"));
 
         assertThat(u.getLoginFailedAttempts()).isZero();
         assertThat(u.getLockedUntil()).isNull();
@@ -229,7 +209,7 @@ class UserServiceTest {
         when(passwordHasher.matches("errada", "hash")).thenReturn(false);
 
         assertThatThrownBy(() ->
-                sut.changePassword(1L, new br.com.fiap.pos.tech_challenge.core.web.dto.ChangePasswordDTO("errada", "NovaSenha@1")))
+                sut.changePassword(1L, new br.com.fiap.pos.tech_challenge.core.application.dto.ChangePasswordDTO("errada", "NovaSenha@1")))
                 .isInstanceOf(CoreException.class);
 
         assertThat(u.getLoginFailedAttempts()).isEqualTo(1);
@@ -244,7 +224,7 @@ class UserServiceTest {
         when(passwordHasher.matches("senhaAtual", "hash")).thenReturn(true);
 
         assertThatThrownBy(() ->
-                sut.changePassword(1L, new br.com.fiap.pos.tech_challenge.core.web.dto.ChangePasswordDTO("senhaAtual", "senhaAtual")))
+                sut.changePassword(1L, new br.com.fiap.pos.tech_challenge.core.application.dto.ChangePasswordDTO("senhaAtual", "senhaAtual")))
                 .isInstanceOf(CoreException.class);
     }
 
@@ -270,7 +250,7 @@ class UserServiceTest {
         when(repository.findById(1L)).thenReturn(Optional.of(u));
 
         assertThatThrownBy(() ->
-                sut.changePassword(1L, new br.com.fiap.pos.tech_challenge.core.web.dto.ChangePasswordDTO("senhaAtual", "novaSenha@1")))
+                sut.changePassword(1L, new br.com.fiap.pos.tech_challenge.core.application.dto.ChangePasswordDTO("senhaAtual", "novaSenha@1")))
                 .isInstanceOf(CoreException.class);
         verify(passwordHasher, never()).matches(any(), any());
     }
@@ -284,7 +264,7 @@ class UserServiceTest {
         when(passwordHasher.matches("errada", "hash")).thenReturn(false);
 
         assertThatThrownBy(() ->
-                sut.changePassword(1L, new br.com.fiap.pos.tech_challenge.core.web.dto.ChangePasswordDTO("errada", "nova@1")))
+                sut.changePassword(1L, new br.com.fiap.pos.tech_challenge.core.application.dto.ChangePasswordDTO("errada", "nova@1")))
                 .isInstanceOf(CoreException.class);
 
         assertThat(u.getLockedUntil()).isNotNull();

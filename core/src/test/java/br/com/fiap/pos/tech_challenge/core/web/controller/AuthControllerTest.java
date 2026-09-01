@@ -1,6 +1,6 @@
 package br.com.fiap.pos.tech_challenge.core.web.controller;
 
-import br.com.fiap.pos.tech_challenge.core.web.dto.LoginDTO;
+import br.com.fiap.pos.tech_challenge.core.application.dto.LoginDTO;
 import br.com.fiap.pos.tech_challenge.core.application.AuthenticationService;
 import br.com.fiap.pos.tech_challenge.core.util.TokenDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;

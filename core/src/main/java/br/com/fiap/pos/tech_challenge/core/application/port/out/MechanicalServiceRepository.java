@@ -2,7 +2,7 @@ package br.com.fiap.pos.tech_challenge.core.application.port.out;
 
 import br.com.fiap.pos.tech_challenge.core.domain.model.MechanicalService;
 import br.com.fiap.pos.tech_challenge.core.domain.enums.ServiceOrderStatus;
-import br.com.fiap.pos.tech_challenge.core.web.dto.ServiceAvgDurationResponse;
+import br.com.fiap.pos.tech_challenge.core.application.dto.ServiceAvgDurationResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 

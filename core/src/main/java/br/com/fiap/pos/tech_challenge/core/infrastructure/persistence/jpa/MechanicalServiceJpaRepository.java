@@ -31,7 +31,7 @@ public interface MechanicalServiceJpaRepository extends JpaRepository<Mechanical
                                                 @Param("statuses") Collection<ServiceOrderStatus> statuses);
 
     @Query("""
-            SELECT new br.com.fiap.pos.tech_challenge.core.web.dto.ServiceAvgDurationResponse(
+            SELECT new br.com.fiap.pos.tech_challenge.core.application.dto.ServiceAvgDurationResponse(
                 qsl.mechanicalService.uuid,
                 qsl.nameSnapshot,
                 AVG(qsl.estimatedDurationMinutes),
@@ -41,6 +41,6 @@ public interface MechanicalServiceJpaRepository extends JpaRepository<Mechanical
             GROUP BY qsl.mechanicalService.uuid, qsl.nameSnapshot
             ORDER BY qsl.nameSnapshot
             """)
-    List<br.com.fiap.pos.tech_challenge.core.web.dto.ServiceAvgDurationResponse> findAvgDurationByService(
+    List<br.com.fiap.pos.tech_challenge.core.application.dto.ServiceAvgDurationResponse> findAvgDurationByService(
             @Param("completedStatuses") Collection<ServiceOrderStatus> completedStatuses);
 }

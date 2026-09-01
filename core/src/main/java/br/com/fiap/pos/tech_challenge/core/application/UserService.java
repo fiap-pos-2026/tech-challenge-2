@@ -1,25 +1,20 @@
 package br.com.fiap.pos.tech_challenge.core.application;
 
-import br.com.fiap.pos.tech_challenge.core.web.dto.ChangePasswordDTO;
-import br.com.fiap.pos.tech_challenge.core.web.dto.CreateUserDTO;
-import br.com.fiap.pos.tech_challenge.core.web.dto.UpdateUserDTO;
-import br.com.fiap.pos.tech_challenge.core.web.dto.UserDTO;
+import br.com.fiap.pos.tech_challenge.core.application.dto.ChangePasswordDTO;
+import br.com.fiap.pos.tech_challenge.core.application.dto.CreateUserDTO;
+import br.com.fiap.pos.tech_challenge.core.application.dto.UpdateUserDTO;
+import br.com.fiap.pos.tech_challenge.core.application.dto.UserDTO;
 import br.com.fiap.pos.tech_challenge.core.domain.model.User;
 import br.com.fiap.pos.tech_challenge.core.domain.enums.AuditEventType;
 import br.com.fiap.pos.tech_challenge.core.domain.enums.EApplicationError;
 import br.com.fiap.pos.tech_challenge.core.domain.enums.UserRole;
 import br.com.fiap.pos.tech_challenge.core.domain.exception.CoreException;
-import br.com.fiap.pos.tech_challenge.core.web.mapper.UserMapper;
+import br.com.fiap.pos.tech_challenge.core.application.mapper.UserMapper;
 import br.com.fiap.pos.tech_challenge.core.application.port.out.UserRepository;
-import br.com.fiap.pos.tech_challenge.core.infrastructure.security.UserDetailsImpl;
 import br.com.fiap.pos.tech_challenge.core.application.port.out.CurrentActorPort;
 import br.com.fiap.pos.tech_challenge.core.application.port.out.PasswordHasher;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.Strings;
-import org.jspecify.annotations.NullMarked;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,7 +25,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-public class UserService implements UserDetailsService {
+public class UserService {
 
     private static final int MAX_PASSWORD_ATTEMPTS = 5;
     private static final int LOCK_DURATION_MINUTES = 15;
@@ -44,14 +39,6 @@ public class UserService implements UserDetailsService {
     private final PasswordHasher passwordHasher;
 
     private final CurrentActorPort currentActorPort;
-
-    @Override
-    @NullMarked
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        return repository.findByLogin(username)
-                .map(UserDetailsImpl::new)
-                .orElseThrow(() -> new CoreException(EApplicationError.INVALID_USERNAME_PASSWORD));
-    }
 
     @Transactional(readOnly = true)
     public List<UserDTO> findAll() {

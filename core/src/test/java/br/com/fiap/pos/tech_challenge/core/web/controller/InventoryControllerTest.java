@@ -1,9 +1,9 @@
 package br.com.fiap.pos.tech_challenge.core.web.controller;
 
-import br.com.fiap.pos.tech_challenge.core.web.dto.ManualAdjustmentRequest;
-import br.com.fiap.pos.tech_challenge.core.web.dto.ReplenishmentRequest;
+import br.com.fiap.pos.tech_challenge.core.application.dto.ManualAdjustmentRequest;
+import br.com.fiap.pos.tech_challenge.core.application.dto.ReplenishmentRequest;
 import br.com.fiap.pos.tech_challenge.core.domain.model.StockMovement;
-import br.com.fiap.pos.tech_challenge.core.web.mapper.StockMovementMapper;
+import br.com.fiap.pos.tech_challenge.core.application.mapper.StockMovementMapper;
 import br.com.fiap.pos.tech_challenge.core.application.StockService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;

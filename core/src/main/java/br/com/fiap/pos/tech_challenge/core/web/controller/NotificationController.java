@@ -1,7 +1,7 @@
 package br.com.fiap.pos.tech_challenge.core.web.controller;
 
-import br.com.fiap.pos.tech_challenge.core.web.dto.NotificationResponse;
-import br.com.fiap.pos.tech_challenge.core.web.mapper.NotificationMapper;
+import br.com.fiap.pos.tech_challenge.core.application.dto.NotificationResponse;
+import br.com.fiap.pos.tech_challenge.core.application.mapper.NotificationMapper;
 import br.com.fiap.pos.tech_challenge.core.infrastructure.security.UserDetailsImpl;
 import br.com.fiap.pos.tech_challenge.core.application.NotificationService;
 import io.swagger.v3.oas.annotations.Operation;

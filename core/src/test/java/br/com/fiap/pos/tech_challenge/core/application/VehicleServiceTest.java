@@ -1,14 +1,14 @@
 package br.com.fiap.pos.tech_challenge.core.application;
 
-import br.com.fiap.pos.tech_challenge.core.web.dto.CreateVehicleRequest;
-import br.com.fiap.pos.tech_challenge.core.web.dto.UpdateVehicleRequest;
-import br.com.fiap.pos.tech_challenge.core.web.dto.VehicleResponse;
+import br.com.fiap.pos.tech_challenge.core.application.dto.CreateVehicleRequest;
+import br.com.fiap.pos.tech_challenge.core.application.dto.UpdateVehicleRequest;
+import br.com.fiap.pos.tech_challenge.core.application.dto.VehicleResponse;
 import br.com.fiap.pos.tech_challenge.core.domain.model.Customer;
 import br.com.fiap.pos.tech_challenge.core.domain.model.Vehicle;
 import br.com.fiap.pos.tech_challenge.core.domain.exception.CoreException;
 import br.com.fiap.pos.tech_challenge.core.domain.exception.DuplicateLicensePlateException;
 import br.com.fiap.pos.tech_challenge.core.domain.exception.VehicleNotFoundException;
-import br.com.fiap.pos.tech_challenge.core.web.mapper.VehicleMapper;
+import br.com.fiap.pos.tech_challenge.core.application.mapper.VehicleMapper;
 import br.com.fiap.pos.tech_challenge.core.application.port.out.VehicleRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

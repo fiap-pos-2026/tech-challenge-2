@@ -1,7 +1,7 @@
 package br.com.fiap.pos.tech_challenge.core.web.controller;
 
-import br.com.fiap.pos.tech_challenge.core.web.dto.CreateProductRequest;
-import br.com.fiap.pos.tech_challenge.core.web.dto.ProductResponse;
+import br.com.fiap.pos.tech_challenge.core.application.dto.CreateProductRequest;
+import br.com.fiap.pos.tech_challenge.core.application.dto.ProductResponse;
 import br.com.fiap.pos.tech_challenge.core.domain.enums.MeasurementUnit;
 import br.com.fiap.pos.tech_challenge.core.domain.enums.ProductType;
 import br.com.fiap.pos.tech_challenge.core.application.ProductService;

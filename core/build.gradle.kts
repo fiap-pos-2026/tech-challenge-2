@@ -16,6 +16,7 @@ dependencies {
     testImplementation(platform("org.testcontainers:testcontainers-bom:2.0.5"))
     testImplementation("org.testcontainers:testcontainers-postgresql")
     testImplementation("org.testcontainers:testcontainers-junit-jupiter")
+    testImplementation("com.tngtech.archunit:archunit-junit5:1.5.0")
 }
 
 dependencyManagement {
@@ -51,6 +52,7 @@ tasks.jacocoTestReport {
             fileTree(it) {
                 exclude(
                     "**/dto/**",
+                    "**/mapper/**",
                     "**/config/**",
                     "**/exception/**",
                     "**/enums/**",
@@ -71,6 +73,10 @@ tasks.jacocoTestCoverageVerification {
             includes = listOf(
                 "br.com.fiap.pos.tech_challenge.core.application.*",
                 "br.com.fiap.pos.tech_challenge.core.validation.*"
+            )
+            excludes = listOf(
+                "br.com.fiap.pos.tech_challenge.core.application.dto",
+                "br.com.fiap.pos.tech_challenge.core.application.mapper"
             )
             limit {
                 counter = "LINE"

@@ -1,6 +1,6 @@
 package br.com.fiap.pos.tech_challenge.core.application;
 
-import br.com.fiap.pos.tech_challenge.core.web.dto.LoginDTO;
+import br.com.fiap.pos.tech_challenge.core.application.dto.LoginDTO;
 import br.com.fiap.pos.tech_challenge.core.domain.model.User;
 import br.com.fiap.pos.tech_challenge.core.domain.enums.UserRole;
 import br.com.fiap.pos.tech_challenge.core.domain.exception.AccountInactiveException;

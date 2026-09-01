@@ -7,7 +7,7 @@ import br.com.fiap.pos.tech_challenge.core.infrastructure.persistence.entity.Rew
 import br.com.fiap.pos.tech_challenge.core.infrastructure.persistence.entity.SecurityAuditLogEntity;
 import br.com.fiap.pos.tech_challenge.core.infrastructure.persistence.mapper.PersistenceMapper;
 import br.com.fiap.pos.tech_challenge.core.integration.BaseIntegrationTest;
-import br.com.fiap.pos.tech_challenge.core.web.dto.ServiceAvgDurationResponse;
+import br.com.fiap.pos.tech_challenge.core.application.dto.ServiceAvgDurationResponse;
 import jakarta.persistence.EntityManager;
 import org.assertj.core.api.recursive.comparison.RecursiveComparisonConfiguration;
 import org.junit.jupiter.api.Test;

@@ -1,13 +1,13 @@
 package br.com.fiap.pos.tech_challenge.core.application;
 
-import br.com.fiap.pos.tech_challenge.core.web.dto.CreateProductRequest;
-import br.com.fiap.pos.tech_challenge.core.web.dto.ProductResponse;
+import br.com.fiap.pos.tech_challenge.core.application.dto.CreateProductRequest;
+import br.com.fiap.pos.tech_challenge.core.application.dto.ProductResponse;
 import br.com.fiap.pos.tech_challenge.core.domain.model.Product;
 import br.com.fiap.pos.tech_challenge.core.domain.enums.MeasurementUnit;
 import br.com.fiap.pos.tech_challenge.core.domain.enums.ProductType;
 import br.com.fiap.pos.tech_challenge.core.domain.exception.CoreException;
 import br.com.fiap.pos.tech_challenge.core.domain.exception.ProductNotFoundException;
-import br.com.fiap.pos.tech_challenge.core.web.mapper.ProductMapper;
+import br.com.fiap.pos.tech_challenge.core.application.mapper.ProductMapper;
 import br.com.fiap.pos.tech_challenge.core.application.port.out.ProductRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

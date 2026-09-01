@@ -1,8 +1,8 @@
 package br.com.fiap.pos.tech_challenge.core.web.controller;
 
-import br.com.fiap.pos.tech_challenge.core.web.dto.CreateVehicleRequest;
-import br.com.fiap.pos.tech_challenge.core.web.dto.UpdateVehicleRequest;
-import br.com.fiap.pos.tech_challenge.core.web.dto.VehicleResponse;
+import br.com.fiap.pos.tech_challenge.core.application.dto.CreateVehicleRequest;
+import br.com.fiap.pos.tech_challenge.core.application.dto.UpdateVehicleRequest;
+import br.com.fiap.pos.tech_challenge.core.application.dto.VehicleResponse;
 import br.com.fiap.pos.tech_challenge.core.application.VehicleService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;

@@ -8,7 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 import br.com.fiap.pos.tech_challenge.core.domain.enums.ServiceOrderStatus;
-import br.com.fiap.pos.tech_challenge.core.web.dto.ServiceAvgDurationResponse;
+import br.com.fiap.pos.tech_challenge.core.application.dto.ServiceAvgDurationResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 

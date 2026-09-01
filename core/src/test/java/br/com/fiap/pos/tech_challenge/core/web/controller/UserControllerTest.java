@@ -1,8 +1,8 @@
 package br.com.fiap.pos.tech_challenge.core.web.controller;
 
-import br.com.fiap.pos.tech_challenge.core.web.dto.CreateUserDTO;
-import br.com.fiap.pos.tech_challenge.core.web.dto.UpdateUserDTO;
-import br.com.fiap.pos.tech_challenge.core.web.dto.UserDTO;
+import br.com.fiap.pos.tech_challenge.core.application.dto.CreateUserDTO;
+import br.com.fiap.pos.tech_challenge.core.application.dto.UpdateUserDTO;
+import br.com.fiap.pos.tech_challenge.core.application.dto.UserDTO;
 import br.com.fiap.pos.tech_challenge.core.application.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;

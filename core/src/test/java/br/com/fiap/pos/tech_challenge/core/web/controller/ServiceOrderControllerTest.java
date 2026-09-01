@@ -1,13 +1,19 @@
 package br.com.fiap.pos.tech_challenge.core.web.controller;
 
-import br.com.fiap.pos.tech_challenge.core.web.dto.*;
+import br.com.fiap.pos.tech_challenge.core.application.dto.*;
 import br.com.fiap.pos.tech_challenge.core.domain.enums.EApplicationError;
 import br.com.fiap.pos.tech_challenge.core.domain.enums.ServiceOrderStatus;
 import br.com.fiap.pos.tech_challenge.core.domain.exception.CustomerNotFoundException;
 import br.com.fiap.pos.tech_challenge.core.web.exception.ExceptionHandling;
 import br.com.fiap.pos.tech_challenge.core.domain.exception.ProductNotFoundException;
 import br.com.fiap.pos.tech_challenge.core.domain.exception.VehicleNotFoundException;
-import br.com.fiap.pos.tech_challenge.core.application.ServiceOrderService;
+import br.com.fiap.pos.tech_challenge.core.application.serviceorder.QuoteApprovalService;
+import br.com.fiap.pos.tech_challenge.core.application.serviceorder.ServiceOrderDeliveryService;
+import br.com.fiap.pos.tech_challenge.core.application.serviceorder.ServiceOrderDiagnosisService;
+import br.com.fiap.pos.tech_challenge.core.application.serviceorder.ServiceOrderDisputeService;
+import br.com.fiap.pos.tech_challenge.core.application.serviceorder.ServiceOrderExecutionService;
+import br.com.fiap.pos.tech_challenge.core.application.serviceorder.ServiceOrderOpeningService;
+import br.com.fiap.pos.tech_challenge.core.application.serviceorder.ServiceOrderQueryService;
 import br.com.fiap.pos.tech_challenge.core.util.Translator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,7 +50,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ExtendWith(MockitoExtension.class)
 class ServiceOrderControllerTest {
 
-    @Mock ServiceOrderService service;
+    @Mock ServiceOrderOpeningService openingService;
+    @Mock ServiceOrderDiagnosisService diagnosisService;
+    @Mock QuoteApprovalService approvalService;
+    @Mock ServiceOrderExecutionService executionService;
+    @Mock ServiceOrderDeliveryService deliveryService;
+    @Mock ServiceOrderDisputeService disputeService;
+    @Mock ServiceOrderQueryService queryService;
 
     @InjectMocks ServiceOrderController controller;
 
@@ -71,7 +83,7 @@ class ServiceOrderControllerTest {
         void open_returns201OnSuccess() throws Exception {
             OpenServiceOrderRequest request = new OpenServiceOrderRequest(
                     UUID.randomUUID(), UUID.randomUUID(), "Barulho no motor", null, null);
-            when(service.openServiceOrder(any(), any(), any(), any(), any())).thenReturn(stubResponse());
+            when(openingService.openServiceOrder(any(), any(), any(), any(), any())).thenReturn(stubResponse());
 
             mockMvc.perform(post("/api/service-orders")
                             .contentType(MediaType.APPLICATION_JSON)
@@ -89,14 +101,14 @@ class ServiceOrderControllerTest {
                     customerUuid, vehicleUuid, "Revisão",
                     java.util.List.of(msUuid),
                     java.util.List.of(new OpenProductItemRequest(productUuid, java.math.BigDecimal.ONE)));
-            when(service.openServiceOrder(any(), any(), any(), any(), any())).thenReturn(stubResponse());
+            when(openingService.openServiceOrder(any(), any(), any(), any(), any())).thenReturn(stubResponse());
 
             mockMvc.perform(post("/api/service-orders")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isCreated());
 
-            verify(service).openServiceOrder(customerUuid, vehicleUuid, "Revisão",
+            verify(openingService).openServiceOrder(customerUuid, vehicleUuid, "Revisão",
                     java.util.List.of(msUuid),
                     java.util.List.of(new OpenProductItemRequest(productUuid, java.math.BigDecimal.ONE)));
         }
@@ -109,7 +121,7 @@ class ServiceOrderControllerTest {
             OpenServiceOrderRequest request = new OpenServiceOrderRequest(
                     UUID.randomUUID(), UUID.randomUUID(), "Revisão", null,
                     java.util.List.of(new OpenProductItemRequest(UUID.randomUUID(), java.math.BigDecimal.ONE)));
-            when(service.openServiceOrder(any(), any(), any(), any(), any()))
+            when(openingService.openServiceOrder(any(), any(), any(), any(), any()))
                     .thenThrow(new ProductNotFoundException());
 
             mockMvcWithAdvice.perform(post("/api/service-orders")
@@ -125,7 +137,7 @@ class ServiceOrderControllerTest {
                     .build();
             OpenServiceOrderRequest request = new OpenServiceOrderRequest(
                     UUID.randomUUID(), UUID.randomUUID(), "Barulho no motor", null, null);
-            when(service.openServiceOrder(any(), any(), any(), any(), any()))
+            when(openingService.openServiceOrder(any(), any(), any(), any(), any()))
                     .thenThrow(new CustomerNotFoundException());
 
             mockMvcWithAdvice.perform(post("/api/service-orders")
@@ -143,7 +155,7 @@ class ServiceOrderControllerTest {
                     .build();
             OpenServiceOrderRequest request = new OpenServiceOrderRequest(
                     UUID.randomUUID(), UUID.randomUUID(), "Barulho no motor", null, null);
-            when(service.openServiceOrder(any(), any(), any(), any(), any()))
+            when(openingService.openServiceOrder(any(), any(), any(), any(), any()))
                     .thenThrow(new VehicleNotFoundException());
 
             mockMvcWithAdvice.perform(post("/api/service-orders")
@@ -160,7 +172,7 @@ class ServiceOrderControllerTest {
     class List {
         @Test
         void list_returns200() throws Exception {
-            when(service.listServiceOrders(isNull(), isNull(), isNull(), isNull(), any()))
+            when(queryService.listServiceOrders(isNull(), isNull(), isNull(), isNull(), any()))
                     .thenReturn(new PageImpl<>(java.util.List.of(stubResponse()), PageRequest.of(0, 20), 1));
 
             mockMvc.perform(get("/api/service-orders"))
@@ -169,7 +181,7 @@ class ServiceOrderControllerTest {
 
         @Test
         void list_filtersByStatus() throws Exception {
-            when(service.listServiceOrders(any(), isNull(), isNull(), isNull(), any()))
+            when(queryService.listServiceOrders(any(), isNull(), isNull(), isNull(), any()))
                     .thenReturn(new PageImpl<>(java.util.List.of(stubResponse()), PageRequest.of(0, 20), 1));
 
             mockMvc.perform(get("/api/service-orders").param("status", "RECEIVED"))
@@ -183,7 +195,7 @@ class ServiceOrderControllerTest {
         @Test
         void get_returns200() throws Exception {
             UUID uuid = UUID.randomUUID();
-            when(service.getServiceOrder(uuid)).thenReturn(stubResponse());
+            when(queryService.getServiceOrder(uuid)).thenReturn(stubResponse());
 
             mockMvc.perform(get("/api/service-orders/{uuid}", uuid))
                     .andExpect(status().isOk());
@@ -196,7 +208,7 @@ class ServiceOrderControllerTest {
         @Test
         void getStatus_returns200() throws Exception {
             UUID uuid = UUID.randomUUID();
-            when(service.getServiceOrderStatus(uuid)).thenReturn(
+            when(queryService.getServiceOrderStatus(uuid)).thenReturn(
                     new ServiceOrderStatusResponse(uuid, ServiceOrderStatus.RECEIVED, null));
 
             mockMvc.perform(get("/api/service-orders/{uuid}/status", uuid))
@@ -210,7 +222,7 @@ class ServiceOrderControllerTest {
         @Test
         void startDiagnosis_returns200() throws Exception {
             UUID uuid = UUID.randomUUID();
-            when(service.startDiagnosis(uuid)).thenReturn(stubResponse());
+            when(diagnosisService.startDiagnosis(uuid)).thenReturn(stubResponse());
 
             mockMvc.perform(post("/api/service-orders/{uuid}/diagnosis/start", uuid))
                     .andExpect(status().isOk());
@@ -224,7 +236,7 @@ class ServiceOrderControllerTest {
         void addService_returns200() throws Exception {
             UUID uuid = UUID.randomUUID();
             AddServiceRequest request = new AddServiceRequest(UUID.randomUUID());
-            when(service.addServiceToDiagnosis(any(), any())).thenReturn(stubResponse());
+            when(diagnosisService.addServiceToDiagnosis(any(), any())).thenReturn(stubResponse());
 
             mockMvc.perform(post("/api/service-orders/{uuid}/diagnosis/services", uuid)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -240,7 +252,7 @@ class ServiceOrderControllerTest {
         void removeService_returns200() throws Exception {
             UUID uuid = UUID.randomUUID();
             UUID msUuid = UUID.randomUUID();
-            when(service.removeServiceFromDiagnosis(uuid, msUuid)).thenReturn(stubResponse());
+            when(diagnosisService.removeServiceFromDiagnosis(uuid, msUuid)).thenReturn(stubResponse());
 
             mockMvc.perform(delete("/api/service-orders/{uuid}/diagnosis/services/{msUuid}", uuid, msUuid))
                     .andExpect(status().isOk());
@@ -254,7 +266,7 @@ class ServiceOrderControllerTest {
         void addProduct_returns200() throws Exception {
             UUID uuid = UUID.randomUUID();
             AddProductRequest request = new AddProductRequest(UUID.randomUUID(), java.math.BigDecimal.ONE);
-            when(service.addProductToDiagnosis(any(), any(), any())).thenReturn(stubResponse());
+            when(diagnosisService.addProductToDiagnosis(any(), any(), any())).thenReturn(stubResponse());
 
             mockMvc.perform(post("/api/service-orders/{uuid}/diagnosis/products", uuid)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -270,7 +282,7 @@ class ServiceOrderControllerTest {
         void removeProduct_returns200() throws Exception {
             UUID uuid = UUID.randomUUID();
             UUID productUuid = UUID.randomUUID();
-            when(service.removeProductFromDiagnosis(uuid, productUuid)).thenReturn(stubResponse());
+            when(diagnosisService.removeProductFromDiagnosis(uuid, productUuid)).thenReturn(stubResponse());
 
             mockMvc.perform(delete("/api/service-orders/{uuid}/diagnosis/products/{productUuid}", uuid, productUuid))
                     .andExpect(status().isOk());
@@ -283,7 +295,7 @@ class ServiceOrderControllerTest {
         @Test
         void completeDiagnosis_returns200() throws Exception {
             UUID uuid = UUID.randomUUID();
-            when(service.completeDiagnosis(uuid)).thenReturn(stubResponse());
+            when(diagnosisService.completeDiagnosis(uuid)).thenReturn(stubResponse());
 
             mockMvc.perform(post("/api/service-orders/{uuid}/diagnosis/complete", uuid))
                     .andExpect(status().isOk());
@@ -297,28 +309,28 @@ class ServiceOrderControllerTest {
         void quoteDecision_approve_returns200() throws Exception {
             UUID uuid = UUID.randomUUID();
             QuoteDecisionRequest request = new QuoteDecisionRequest("token123", "52998224725", QuoteDecisionType.APPROVE);
-            when(service.approveQuote(any(), any(), any())).thenReturn(stubResponse());
+            when(approvalService.approveQuote(any(), any(), any())).thenReturn(stubResponse());
 
             mockMvc.perform(post("/api/service-orders/{uuid}/approval", uuid)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isOk());
 
-            verify(service).approveQuote(uuid, "52998224725", "token123");
+            verify(approvalService).approveQuote(uuid, "52998224725", "token123");
         }
 
         @Test
         void quoteDecision_reject_returns200() throws Exception {
             UUID uuid = UUID.randomUUID();
             QuoteDecisionRequest request = new QuoteDecisionRequest("token123", "52998224725", QuoteDecisionType.REJECT);
-            when(service.rejectQuote(any(), any(), any(), any())).thenReturn(stubResponse());
+            when(approvalService.rejectQuote(any(), any(), any())).thenReturn(stubResponse());
 
             mockMvc.perform(post("/api/service-orders/{uuid}/approval", uuid)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isOk());
 
-            verify(service).rejectQuote(uuid, "52998224725", "token123", null);
+            verify(approvalService).rejectQuote(uuid, "52998224725", "token123");
         }
     }
 
@@ -332,7 +344,7 @@ class ServiceOrderControllerTest {
             mockMvc.perform(post("/api/service-orders/{uuid}/otp/resend", uuid))
                     .andExpect(status().isOk());
 
-            verify(service).resendOTP(uuid);
+            verify(approvalService).resendOTP(uuid);
         }
     }
 
@@ -342,7 +354,7 @@ class ServiceOrderControllerTest {
         @Test
         void completeExecution_returns200() throws Exception {
             UUID uuid = UUID.randomUUID();
-            when(service.completeExecution(uuid)).thenReturn(stubResponse());
+            when(executionService.completeExecution(uuid)).thenReturn(stubResponse());
 
             mockMvc.perform(post("/api/service-orders/{uuid}/execution/complete", uuid))
                     .andExpect(status().isOk());
@@ -356,25 +368,25 @@ class ServiceOrderControllerTest {
         void acceptDelivery_byOtp_returns200() throws Exception {
             UUID uuid = UUID.randomUUID();
             AcceptDeliveryRequest request = new AcceptDeliveryRequest("token123", "52998224725");
-            when(service.acceptDelivery(any(), any(), any(), any(Boolean.class))).thenReturn(stubResponse());
+            when(deliveryService.acceptDelivery(any(), any(), any())).thenReturn(stubResponse());
 
             mockMvc.perform(post("/api/service-orders/{uuid}/delivery/accept", uuid)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isOk());
 
-            verify(service).acceptDelivery(uuid, "52998224725", "token123", false);
+            verify(deliveryService).acceptDelivery(uuid, "52998224725", "token123");
         }
 
         @Test
         void acceptDelivery_withoutBody_returns200() throws Exception {
             UUID uuid = UUID.randomUUID();
-            when(service.acceptDelivery(any(), isNull(), isNull(), any(Boolean.class))).thenReturn(stubResponse());
+            when(deliveryService.acceptDelivery(any(), isNull(), isNull())).thenReturn(stubResponse());
 
             mockMvc.perform(post("/api/service-orders/{uuid}/delivery/accept", uuid))
                     .andExpect(status().isOk());
 
-            verify(service).acceptDelivery(uuid, null, null, false);
+            verify(deliveryService).acceptDelivery(uuid, null, null);
         }
     }
 
@@ -385,7 +397,7 @@ class ServiceOrderControllerTest {
         void rejectDelivery_returns200() throws Exception {
             UUID uuid = UUID.randomUUID();
             RejectDeliveryRequest request = new RejectDeliveryRequest("token123", "52998224725", "pecas com defeito");
-            when(service.rejectDelivery(any(), any(), any(), any())).thenReturn(stubResponse());
+            when(deliveryService.rejectDelivery(any(), any(), any(), any())).thenReturn(stubResponse());
 
             mockMvc.perform(post("/api/service-orders/{uuid}/delivery/reject", uuid)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -401,7 +413,7 @@ class ServiceOrderControllerTest {
         void requestProduct_returns200() throws Exception {
             UUID uuid = UUID.randomUUID();
             RequestProductRequest request = new RequestProductRequest(UUID.randomUUID(), java.math.BigDecimal.ONE);
-            when(service.requestProduct(any(), any(), any(), any())).thenReturn(stubResponse());
+            when(executionService.requestProduct(any(), any(), any())).thenReturn(stubResponse());
 
             mockMvc.perform(post("/api/service-orders/{uuid}/execution/products", uuid)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -418,7 +430,7 @@ class ServiceOrderControllerTest {
             UUID uuid = UUID.randomUUID();
             UUID productUuid = UUID.randomUUID();
             ReturnProductRequest request = new ReturnProductRequest("senha123", UUID.randomUUID());
-            when(service.returnProduct(any(), any(), any(), any())).thenReturn(stubResponse());
+            when(executionService.returnProduct(any(), any(), any())).thenReturn(stubResponse());
 
             mockMvc.perform(delete("/api/service-orders/{uuid}/products/{productUuid}", uuid, productUuid)
                             .contentType(MediaType.APPLICATION_JSON)
@@ -434,25 +446,25 @@ class ServiceOrderControllerTest {
         void closeDispute_withBody_returns200() throws Exception {
             UUID uuid = UUID.randomUUID();
             CloseDisputeRequest request = new CloseDisputeRequest("resolucao");
-            when(service.closeDispute(any(), any(), any())).thenReturn(stubResponse());
+            when(disputeService.closeDispute(any(), any())).thenReturn(stubResponse());
 
             mockMvc.perform(post("/api/service-orders/{uuid}/close-dispute", uuid)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isOk());
 
-            verify(service).closeDispute(uuid, "resolucao", null);
+            verify(disputeService).closeDispute(uuid, "resolucao");
         }
 
         @Test
         void closeDispute_withoutBody_returns200() throws Exception {
             UUID uuid = UUID.randomUUID();
-            when(service.closeDispute(any(), isNull(), any())).thenReturn(stubResponse());
+            when(disputeService.closeDispute(any(), isNull())).thenReturn(stubResponse());
 
             mockMvc.perform(post("/api/service-orders/{uuid}/close-dispute", uuid))
                     .andExpect(status().isOk());
 
-            verify(service).closeDispute(uuid, null, null);
+            verify(disputeService).closeDispute(uuid, null);
         }
     }
 }

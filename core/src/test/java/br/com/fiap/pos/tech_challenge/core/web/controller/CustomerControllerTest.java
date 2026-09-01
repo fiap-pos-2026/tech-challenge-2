@@ -1,8 +1,8 @@
 package br.com.fiap.pos.tech_challenge.core.web.controller;
 
-import br.com.fiap.pos.tech_challenge.core.web.dto.CreateCustomerRequest;
-import br.com.fiap.pos.tech_challenge.core.web.dto.CustomerResponse;
-import br.com.fiap.pos.tech_challenge.core.web.dto.UpdateCustomerRequest;
+import br.com.fiap.pos.tech_challenge.core.application.dto.CreateCustomerRequest;
+import br.com.fiap.pos.tech_challenge.core.application.dto.CustomerResponse;
+import br.com.fiap.pos.tech_challenge.core.application.dto.UpdateCustomerRequest;
 import br.com.fiap.pos.tech_challenge.core.domain.enums.DocumentType;
 import br.com.fiap.pos.tech_challenge.core.application.CustomerService;
 import com.fasterxml.jackson.databind.ObjectMapper;

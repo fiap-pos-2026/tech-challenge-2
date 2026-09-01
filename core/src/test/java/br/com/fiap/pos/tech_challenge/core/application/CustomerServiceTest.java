@@ -1,14 +1,14 @@
 package br.com.fiap.pos.tech_challenge.core.application;
 
-import br.com.fiap.pos.tech_challenge.core.web.dto.CreateCustomerRequest;
-import br.com.fiap.pos.tech_challenge.core.web.dto.CustomerResponse;
-import br.com.fiap.pos.tech_challenge.core.web.dto.UpdateCustomerRequest;
+import br.com.fiap.pos.tech_challenge.core.application.dto.CreateCustomerRequest;
+import br.com.fiap.pos.tech_challenge.core.application.dto.CustomerResponse;
+import br.com.fiap.pos.tech_challenge.core.application.dto.UpdateCustomerRequest;
 import br.com.fiap.pos.tech_challenge.core.domain.model.Customer;
 import br.com.fiap.pos.tech_challenge.core.domain.enums.DocumentType;
 import br.com.fiap.pos.tech_challenge.core.domain.exception.CoreException;
 import br.com.fiap.pos.tech_challenge.core.domain.exception.CustomerNotFoundException;
 import br.com.fiap.pos.tech_challenge.core.domain.exception.DuplicateDocumentException;
-import br.com.fiap.pos.tech_challenge.core.web.mapper.CustomerMapper;
+import br.com.fiap.pos.tech_challenge.core.application.mapper.CustomerMapper;
 import br.com.fiap.pos.tech_challenge.core.application.port.out.CustomerRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

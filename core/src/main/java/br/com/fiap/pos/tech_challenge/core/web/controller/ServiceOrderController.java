@@ -1,10 +1,15 @@
 package br.com.fiap.pos.tech_challenge.core.web.controller;
 
-import br.com.fiap.pos.tech_challenge.core.web.dto.*;
+import br.com.fiap.pos.tech_challenge.core.application.dto.*;
 import br.com.fiap.pos.tech_challenge.core.domain.enums.ServiceOrderStatus;
 import org.springframework.format.annotation.DateTimeFormat;
-import br.com.fiap.pos.tech_challenge.core.infrastructure.security.UserDetailsImpl;
-import br.com.fiap.pos.tech_challenge.core.application.ServiceOrderService;
+import br.com.fiap.pos.tech_challenge.core.application.serviceorder.QuoteApprovalService;
+import br.com.fiap.pos.tech_challenge.core.application.serviceorder.ServiceOrderDeliveryService;
+import br.com.fiap.pos.tech_challenge.core.application.serviceorder.ServiceOrderDiagnosisService;
+import br.com.fiap.pos.tech_challenge.core.application.serviceorder.ServiceOrderDisputeService;
+import br.com.fiap.pos.tech_challenge.core.application.serviceorder.ServiceOrderExecutionService;
+import br.com.fiap.pos.tech_challenge.core.application.serviceorder.ServiceOrderOpeningService;
+import br.com.fiap.pos.tech_challenge.core.application.serviceorder.ServiceOrderQueryService;
 import br.com.fiap.pos.tech_challenge.core.util.WebUtility;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -23,7 +28,6 @@ import java.time.LocalDateTime;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -38,7 +42,13 @@ import java.util.UUID;
 @Tag(name = "Service Orders")
 public class ServiceOrderController {
 
-    private final ServiceOrderService service;
+    private final ServiceOrderOpeningService openingService;
+    private final ServiceOrderDiagnosisService diagnosisService;
+    private final QuoteApprovalService approvalService;
+    private final ServiceOrderExecutionService executionService;
+    private final ServiceOrderDeliveryService deliveryService;
+    private final ServiceOrderDisputeService disputeService;
+    private final ServiceOrderQueryService queryService;
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Open a new service order", operationId = "open-service-order")
@@ -48,7 +58,7 @@ public class ServiceOrderController {
     })
     @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT')")
     public ResponseEntity<ServiceOrderResponse> open(@RequestBody @Valid OpenServiceOrderRequest request) {
-        ServiceOrderResponse created = service.openServiceOrder(
+        ServiceOrderResponse created = openingService.openServiceOrder(
                 request.customerUuid(), request.vehicleUuid(), request.customerComplaint(),
                 request.mechanicalServiceUuids(), request.products());
         return ResponseEntity.created(WebUtility.getLocation(created.uuid())).body(created);
@@ -64,7 +74,7 @@ public class ServiceOrderController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
             @ParameterObject @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
-        return ResponseEntity.ok(service.listServiceOrders(status, customerUuid, from, to, pageable));
+        return ResponseEntity.ok(queryService.listServiceOrders(status, customerUuid, from, to, pageable));
     }
 
     @GetMapping(path = "/{uuid}", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -73,7 +83,7 @@ public class ServiceOrderController {
             content = @Content(schema = @Schema(implementation = UUID.class)))
     @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT', 'MECHANIC')")
     public ResponseEntity<ServiceOrderResponse> get(@PathVariable UUID uuid) {
-        return ResponseEntity.ok(service.getServiceOrder(uuid));
+        return ResponseEntity.ok(queryService.getServiceOrder(uuid));
     }
 
     @GetMapping(path = "/{uuid}/status", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -84,7 +94,7 @@ public class ServiceOrderController {
             @ApiResponse(responseCode = "404", description = "Service order not found")
     })
     public ResponseEntity<ServiceOrderStatusResponse> getStatus(@PathVariable UUID uuid) {
-        return ResponseEntity.ok(service.getServiceOrderStatus(uuid));
+        return ResponseEntity.ok(queryService.getServiceOrderStatus(uuid));
     }
 
     @PostMapping(path = "/{uuid}/diagnosis/start", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -95,7 +105,7 @@ public class ServiceOrderController {
     })
     @PreAuthorize("hasAnyRole('ADMIN', 'MECHANIC')")
     public ResponseEntity<ServiceOrderResponse> startDiagnosis(@PathVariable UUID uuid) {
-        return ResponseEntity.ok(service.startDiagnosis(uuid));
+        return ResponseEntity.ok(diagnosisService.startDiagnosis(uuid));
     }
 
     @PostMapping(path = "/{uuid}/diagnosis/services",
@@ -104,7 +114,7 @@ public class ServiceOrderController {
     @PreAuthorize("hasAnyRole('ADMIN', 'MECHANIC')")
     public ResponseEntity<ServiceOrderResponse> addService(@PathVariable UUID uuid,
                                                             @RequestBody @Valid AddServiceRequest request) {
-        return ResponseEntity.ok(service.addServiceToDiagnosis(uuid, request.mechanicalServiceUuid()));
+        return ResponseEntity.ok(diagnosisService.addServiceToDiagnosis(uuid, request.mechanicalServiceUuid()));
     }
 
     @DeleteMapping(path = "/{uuid}/diagnosis/services/{mechanicalServiceUuid}",
@@ -118,7 +128,7 @@ public class ServiceOrderController {
     @PreAuthorize("hasAnyRole('ADMIN', 'MECHANIC')")
     public ResponseEntity<ServiceOrderResponse> removeService(@PathVariable UUID uuid,
                                                                @PathVariable UUID mechanicalServiceUuid) {
-        return ResponseEntity.ok(service.removeServiceFromDiagnosis(uuid, mechanicalServiceUuid));
+        return ResponseEntity.ok(diagnosisService.removeServiceFromDiagnosis(uuid, mechanicalServiceUuid));
     }
 
     @PostMapping(path = "/{uuid}/diagnosis/products",
@@ -127,7 +137,7 @@ public class ServiceOrderController {
     @PreAuthorize("hasAnyRole('ADMIN', 'MECHANIC')")
     public ResponseEntity<ServiceOrderResponse> addProduct(@PathVariable UUID uuid,
                                                             @RequestBody @Valid AddProductRequest request) {
-        return ResponseEntity.ok(service.addProductToDiagnosis(uuid, request.productUuid(), request.quantity()));
+        return ResponseEntity.ok(diagnosisService.addProductToDiagnosis(uuid, request.productUuid(), request.quantity()));
     }
 
     @DeleteMapping(path = "/{uuid}/diagnosis/products/{productUuid}",
@@ -141,7 +151,7 @@ public class ServiceOrderController {
     @PreAuthorize("hasAnyRole('ADMIN', 'MECHANIC')")
     public ResponseEntity<ServiceOrderResponse> removeProductFromDiagnosis(@PathVariable UUID uuid,
                                                                             @PathVariable UUID productUuid) {
-        return ResponseEntity.ok(service.removeProductFromDiagnosis(uuid, productUuid));
+        return ResponseEntity.ok(diagnosisService.removeProductFromDiagnosis(uuid, productUuid));
     }
 
     @PostMapping(path = "/{uuid}/diagnosis/complete", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -152,7 +162,7 @@ public class ServiceOrderController {
     })
     @PreAuthorize("hasAnyRole('ADMIN', 'MECHANIC')")
     public ResponseEntity<ServiceOrderResponse> completeDiagnosis(@PathVariable UUID uuid) {
-        return ResponseEntity.ok(service.completeDiagnosis(uuid));
+        return ResponseEntity.ok(diagnosisService.completeDiagnosis(uuid));
     }
 
     @PostMapping(path = "/{uuid}/approval",
@@ -166,11 +176,10 @@ public class ServiceOrderController {
     })
     @PreAuthorize("permitAll()")
     public ResponseEntity<ServiceOrderResponse> quoteDecision(@PathVariable UUID uuid,
-                                                               @RequestBody @Valid QuoteDecisionRequest request,
-                                                               @AuthenticationPrincipal UserDetailsImpl principal) {
+                                                               @RequestBody @Valid QuoteDecisionRequest request) {
         ServiceOrderResponse response = switch (request.decision()) {
-            case APPROVE -> service.approveQuote(uuid, request.customerDocument(), request.token());
-            case REJECT -> service.rejectQuote(uuid, request.customerDocument(), request.token(), principal);
+            case APPROVE -> approvalService.approveQuote(uuid, request.customerDocument(), request.token());
+            case REJECT -> approvalService.rejectQuote(uuid, request.customerDocument(), request.token());
         };
         return ResponseEntity.ok(response);
     }
@@ -183,7 +192,7 @@ public class ServiceOrderController {
     })
     @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT')")
     public ResponseEntity<Void> resendOtp(@PathVariable UUID uuid) {
-        service.resendOTP(uuid);
+        approvalService.resendOTP(uuid);
         return ResponseEntity.ok().build();
     }
 
@@ -197,9 +206,8 @@ public class ServiceOrderController {
     })
     @PreAuthorize("hasAnyRole('ADMIN', 'MECHANIC')")
     public ResponseEntity<ServiceOrderResponse> requestProduct(@PathVariable UUID uuid,
-                                                                @RequestBody @Valid RequestProductRequest request,
-                                                                @AuthenticationPrincipal UserDetailsImpl principal) {
-        return ResponseEntity.ok(service.requestProduct(uuid, request.productUuid(), request.quantity(), principal));
+                                                                @RequestBody @Valid RequestProductRequest request) {
+        return ResponseEntity.ok(executionService.requestProduct(uuid, request.productUuid(), request.quantity()));
     }
 
     @DeleteMapping(path = "/{uuid}/products/{productUuid}",
@@ -215,9 +223,8 @@ public class ServiceOrderController {
     @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT')")
     public ResponseEntity<ServiceOrderResponse> returnProduct(@PathVariable UUID uuid,
                                                                @PathVariable UUID productUuid,
-                                                               @RequestBody @Valid ReturnProductRequest request,
-                                                               @AuthenticationPrincipal UserDetailsImpl principal) {
-        return ResponseEntity.ok(service.returnProduct(uuid, productUuid, request.password(), principal));
+                                                               @RequestBody @Valid ReturnProductRequest request) {
+        return ResponseEntity.ok(executionService.returnProduct(uuid, productUuid, request.password()));
     }
 
     @PostMapping(path = "/{uuid}/execution/complete", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -228,7 +235,7 @@ public class ServiceOrderController {
     })
     @PreAuthorize("hasAnyRole('ADMIN', 'MECHANIC')")
     public ResponseEntity<ServiceOrderResponse> completeExecution(@PathVariable UUID uuid) {
-        return ResponseEntity.ok(service.completeExecution(uuid));
+        return ResponseEntity.ok(executionService.completeExecution(uuid));
     }
 
     @PostMapping(path = "/{uuid}/delivery/accept",
@@ -241,12 +248,10 @@ public class ServiceOrderController {
     })
     @PreAuthorize("permitAll()")
     public ResponseEntity<ServiceOrderResponse> acceptDelivery(@PathVariable UUID uuid,
-                                                                @RequestBody(required = false) AcceptDeliveryRequest request,
-                                                                @AuthenticationPrincipal UserDetailsImpl principal) {
-        boolean byJwt = principal != null;
+                                                                @RequestBody(required = false) AcceptDeliveryRequest request) {
         String token = (request != null) ? request.token() : null;
         String doc = (request != null) ? request.customerDocument() : null;
-        return ResponseEntity.ok(service.acceptDelivery(uuid, doc, token, byJwt));
+        return ResponseEntity.ok(deliveryService.acceptDelivery(uuid, doc, token));
     }
 
     @PostMapping(path = "/{uuid}/delivery/reject",
@@ -260,7 +265,7 @@ public class ServiceOrderController {
     @PreAuthorize("permitAll()")
     public ResponseEntity<ServiceOrderResponse> rejectDelivery(@PathVariable UUID uuid,
                                                                 @RequestBody @Valid RejectDeliveryRequest request) {
-        return ResponseEntity.ok(service.rejectDelivery(uuid, request.customerDocument(),
+        return ResponseEntity.ok(deliveryService.rejectDelivery(uuid, request.customerDocument(),
                 request.token(), request.reason()));
     }
 
@@ -273,9 +278,8 @@ public class ServiceOrderController {
     })
     @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT')")
     public ResponseEntity<ServiceOrderResponse> closeDispute(@PathVariable UUID uuid,
-                                                              @RequestBody(required = false) CloseDisputeRequest request,
-                                                              @AuthenticationPrincipal UserDetailsImpl principal) {
+                                                              @RequestBody(required = false) CloseDisputeRequest request) {
         String resolution = (request != null) ? request.resolution() : null;
-        return ResponseEntity.ok(service.closeDispute(uuid, resolution, principal));
+        return ResponseEntity.ok(disputeService.closeDispute(uuid, resolution));
     }
 }

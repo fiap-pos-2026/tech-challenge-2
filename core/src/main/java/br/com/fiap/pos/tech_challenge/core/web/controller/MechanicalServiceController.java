@@ -1,8 +1,8 @@
 package br.com.fiap.pos.tech_challenge.core.web.controller;
 
-import br.com.fiap.pos.tech_challenge.core.web.dto.CreateServiceRequest;
-import br.com.fiap.pos.tech_challenge.core.web.dto.MechanicalServiceResponse;
-import br.com.fiap.pos.tech_challenge.core.web.dto.ServiceAvgDurationResponse;
+import br.com.fiap.pos.tech_challenge.core.application.dto.CreateServiceRequest;
+import br.com.fiap.pos.tech_challenge.core.application.dto.MechanicalServiceResponse;
+import br.com.fiap.pos.tech_challenge.core.application.dto.ServiceAvgDurationResponse;
 import br.com.fiap.pos.tech_challenge.core.application.MechanicalServiceService;
 import br.com.fiap.pos.tech_challenge.core.util.WebUtility;
 import io.swagger.v3.oas.annotations.Operation;

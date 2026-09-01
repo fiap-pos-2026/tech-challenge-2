@@ -43,7 +43,7 @@ public class SecurityConfig {
     @Value("${jwt.private.key}")
     private RSAPrivateKey privateKey;
 
-    @Qualifier("userService")
+    @Qualifier("springUserDetailsService")
     private final UserDetailsService details;
 
     private final AuthenticationConfiguration configuration;

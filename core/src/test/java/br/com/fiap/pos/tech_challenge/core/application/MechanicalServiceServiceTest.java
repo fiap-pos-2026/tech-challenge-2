@@ -1,11 +1,11 @@
 package br.com.fiap.pos.tech_challenge.core.application;
 
-import br.com.fiap.pos.tech_challenge.core.web.dto.CreateServiceRequest;
-import br.com.fiap.pos.tech_challenge.core.web.dto.MechanicalServiceResponse;
+import br.com.fiap.pos.tech_challenge.core.application.dto.CreateServiceRequest;
+import br.com.fiap.pos.tech_challenge.core.application.dto.MechanicalServiceResponse;
 import br.com.fiap.pos.tech_challenge.core.domain.model.MechanicalService;
 import br.com.fiap.pos.tech_challenge.core.domain.exception.CoreException;
 import br.com.fiap.pos.tech_challenge.core.domain.exception.MechanicalServiceNotFoundException;
-import br.com.fiap.pos.tech_challenge.core.web.mapper.MechanicalServiceMapper;
+import br.com.fiap.pos.tech_challenge.core.application.mapper.MechanicalServiceMapper;
 import br.com.fiap.pos.tech_challenge.core.application.port.out.MechanicalServiceRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

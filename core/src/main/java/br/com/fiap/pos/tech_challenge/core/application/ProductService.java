@@ -1,13 +1,13 @@
 package br.com.fiap.pos.tech_challenge.core.application;
 
-import br.com.fiap.pos.tech_challenge.core.web.dto.CreateProductRequest;
-import br.com.fiap.pos.tech_challenge.core.web.dto.ProductResponse;
+import br.com.fiap.pos.tech_challenge.core.application.dto.CreateProductRequest;
+import br.com.fiap.pos.tech_challenge.core.application.dto.ProductResponse;
 import br.com.fiap.pos.tech_challenge.core.domain.model.Product;
 import br.com.fiap.pos.tech_challenge.core.domain.enums.EApplicationError;
 import br.com.fiap.pos.tech_challenge.core.domain.enums.ServiceOrderStatus;
 import br.com.fiap.pos.tech_challenge.core.domain.exception.CoreException;
 import br.com.fiap.pos.tech_challenge.core.domain.exception.ProductNotFoundException;
-import br.com.fiap.pos.tech_challenge.core.web.mapper.ProductMapper;
+import br.com.fiap.pos.tech_challenge.core.application.mapper.ProductMapper;
 import br.com.fiap.pos.tech_challenge.core.application.port.out.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;

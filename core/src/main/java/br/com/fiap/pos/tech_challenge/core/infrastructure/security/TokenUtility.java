@@ -2,7 +2,6 @@ package br.com.fiap.pos.tech_challenge.core.infrastructure.security;
 
 import br.com.fiap.pos.tech_challenge.core.domain.enums.EApplicationError;
 import br.com.fiap.pos.tech_challenge.core.domain.exception.CoreException;
-import br.com.fiap.pos.tech_challenge.core.web.mapper.TokenMapper;
 import br.com.fiap.pos.tech_challenge.core.util.TokenDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
