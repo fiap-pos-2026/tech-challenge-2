@@ -6,13 +6,13 @@
 #   1. instala o microk8s (snap) se o binário não existir no host;
 #   2. sobe o cluster se ele não estiver respondendo;
 #   3. garante os addons exigidos pela app (o `microk8s enable` é idempotente);
-#   4. (re)escreve o kubeconfig que os providers kubernetes/helm (providers.tf) consomem a
+#   4. (re)escreve o kubeconfig que o provider kubernetes (providers.tf) consome a
 #      seguir via depends_on.
 #
 # Ou seja: se o cluster já existe, todos os passos viram no-op; se não existe, ele é criado —
 # "se não existir cluster, cria". Como o local-exec não é interativo (no CI menos ainda), os
 # comandos `sudo` abaixo exigem sudo SEM SENHA para snap/microk8s/usermod no host do runner —
-# ver SETUP-WSL.md na raiz do repositório.
+# ver a seção "Autenticação do sudo" em infra/README.md.
 #
 # Para usar um cluster gerenciado na cloud (EKS/GKE/AKS), substitua este arquivo pelo módulo do
 # provider correspondente e aponte kubeconfig_path/kube_context para o kubeconfig desse cluster;

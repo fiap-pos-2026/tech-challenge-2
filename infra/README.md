@@ -27,8 +27,8 @@ microk8s roda como serviço no próprio host (WSL2/Ubuntu) — não é algo que 
 cria, pois esse provider já pressupõe um cluster respondendo. Por isso `cluster.tf` usa um
 `null_resource` com `local-exec` que, **a cada `apply`**, valida o ambiente e age só no que
 falta: instala o snap do microk8s quando ausente, sobe o cluster se estiver parado, garante os
-addons e (re)escreve o kubeconfig que os providers `kubernetes`/`helm` (`providers.tf`) passam a
-usar. O script é idempotente — reexecuta sem efeito colateral se o cluster já existir — então
+addons e (re)escreve o kubeconfig que o provider `kubernetes` (`providers.tf`) passa a usar. O
+script é idempotente — reexecuta sem efeito colateral se o cluster já existir — então
 cobre tanto o primeiro `apply` numa máquina limpa quanto as execuções seguintes do CI. Não há
 mais a flag `manage_microk8s`: "se não existir cluster, cria".
 
@@ -58,8 +58,15 @@ senha.
 
 - **No runner self-hosted do CI**: o `terraform apply` do CI roda `cluster.tf` de forma
   totalmente automatizada, então o usuário do runner precisa de **sudo sem senha** restrito a
-  `snap`, `microk8s` e `usermod`. Como configurar isso (sudoers drop-in), além de systemd no
-  WSL, runner como serviço e boot automático, está em **`SETUP-WSL.md`** na raiz do repositório.
+  `snap`, `microk8s` e `usermod` — um drop-in em `/etc/sudoers.d/`:
+
+  ```
+  <usuario-do-runner> ALL=(root) NOPASSWD: /usr/bin/snap, /snap/bin/microk8s, /usr/sbin/usermod
+  ```
+
+  O WSL precisa de systemd ativo (`[boot] systemd=true` em `/etc/wsl.conf`) e o runner do GitHub
+  Actions configurado como serviço (`./svc.sh install && ./svc.sh start`) para subir junto com a
+  distro.
 
 ## Variáveis
 
@@ -183,4 +190,4 @@ Isso remove namespace, PostgreSQL, Redis e Mailpit do cluster. **Não desinstala
 `null_resource.microk8s` só instala/valida no `apply` e é deliberadamente sem efeito no
 `destroy`, para não arriscar remover o cluster e seu estado por engano. Para desinstalar o
 microk8s (por exemplo, para provar o provisionamento do zero pelo CI), faça manualmente com
-`sudo snap remove microk8s --purge` — ver `SETUP-WSL.md`.
+`sudo snap remove microk8s --purge`.

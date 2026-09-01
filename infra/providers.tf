@@ -4,7 +4,7 @@
 # kubeconfig desse cluster. Ver `infra/README.md`.
 
 variable "kubeconfig_path" {
-  description = "Caminho do kubeconfig do cluster — destino de `microk8s config` em cluster.tf e fonte dos providers kubernetes/helm."
+  description = "Caminho do kubeconfig do cluster — destino de `microk8s config` em cluster.tf e fonte do provider kubernetes."
   type        = string
   default     = "~/.kube/config"
 }
@@ -18,11 +18,4 @@ variable "kube_context" {
 provider "kubernetes" {
   config_path    = var.kubeconfig_path
   config_context = var.kube_context != "" ? var.kube_context : null
-}
-
-provider "helm" {
-  kubernetes {
-    config_path    = var.kubeconfig_path
-    config_context = var.kube_context != "" ? var.kube_context : null
-  }
 }

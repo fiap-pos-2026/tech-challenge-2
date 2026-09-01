@@ -21,7 +21,24 @@ dependencies {
 
 dependencyManagement {
     dependencies {
-        dependency("com.fasterxml.jackson.core:jackson-databind:2.22.0")
+        dependency("com.fasterxml.jackson.core:jackson-databind:2.22.1")
+        dependency("tools.jackson.core:jackson-core:3.1.5")
+        dependency("tools.jackson.core:jackson-databind:3.1.5")
+        dependency("org.apache.logging.log4j:log4j-api:2.25.5")
+        dependency("org.apache.logging.log4j:log4j-to-slf4j:2.25.5")
+        dependency("org.postgresql:postgresql:42.7.12")
+
+        dependencySet(mapOf("group" to "io.netty", "version" to "4.2.16.Final")) {
+            entry("netty-buffer")
+            entry("netty-codec-base")
+            entry("netty-codec-dns")
+            entry("netty-common")
+            entry("netty-handler")
+            entry("netty-resolver")
+            entry("netty-resolver-dns")
+            entry("netty-transport")
+            entry("netty-transport-native-unix-common")
+        }
     }
 }
 
