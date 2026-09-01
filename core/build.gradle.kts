@@ -67,10 +67,10 @@ tasks.jacocoTestCoverageVerification {
     dependsOn(tasks.jacocoTestReport)
     violationRules {
         rule {
-            // measure only service, scheduler, and validation packages (excludes controllers, repos, DTOs)
+            // measure only the application layer (use cases + scheduler) and validators
+            // (excludes controllers, adapters, persistence, DTOs)
             includes = listOf(
-                "br.com.fiap.pos.tech_challenge.core.service.*",
-                "br.com.fiap.pos.tech_challenge.core.scheduler.*",
+                "br.com.fiap.pos.tech_challenge.core.application.*",
                 "br.com.fiap.pos.tech_challenge.core.validation.*"
             )
             limit {

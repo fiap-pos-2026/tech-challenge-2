@@ -1,0 +1,91 @@
+package br.com.fiap.pos.tech_challenge.core.web.controller;
+
+import br.com.fiap.pos.tech_challenge.core.web.dto.ManualAdjustmentRequest;
+import br.com.fiap.pos.tech_challenge.core.web.dto.ReplenishmentRequest;
+import br.com.fiap.pos.tech_challenge.core.web.dto.StockMovementResponse;
+import br.com.fiap.pos.tech_challenge.core.domain.model.StockMovement;
+import br.com.fiap.pos.tech_challenge.core.web.mapper.StockMovementMapper;
+import br.com.fiap.pos.tech_challenge.core.infrastructure.security.UserDetailsImpl;
+import br.com.fiap.pos.tech_challenge.core.application.StockService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
+
+/**
+ * @author johncgo
+ * @since 2026-06-26
+ */
+@RestController
+@RequestMapping("/api/inventory")
+@RequiredArgsConstructor
+@Tag(name = "Inventory - Stock")
+public class InventoryController {
+
+    private final StockService stockService;
+    private final StockMovementMapper movementMapper;
+
+    @PostMapping(path = "/products/{uuid}/replenishment",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "Replenish product stock", operationId = "replenish-product")
+    @Parameter(
+            name = "uuid",
+            description = "The product UUID.",
+            required = true,
+            content = @Content(schema = @Schema(implementation = UUID.class))
+    )
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT')")
+    public ResponseEntity<Void> replenish(@PathVariable UUID uuid,
+                                          @RequestBody @Valid ReplenishmentRequest request,
+                                          @AuthenticationPrincipal UserDetailsImpl principal) {
+        stockService.replenish(uuid, request.quantity(), principal != null ? principal.user() : null);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping(path = "/manual-adjustment",
+            consumes = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(
+            summary = "Register a manual adjustment for consumed non-returnable items (audit only — no stock change)",
+            operationId = "register-manual-adjustment")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Adjustment recorded"),
+            @ApiResponse(responseCode = "404", description = "Product not found")
+    })
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT')")
+    public ResponseEntity<Void> registerManualAdjustment(
+            @RequestBody @Valid ManualAdjustmentRequest request,
+            @AuthenticationPrincipal UserDetailsImpl principal) {
+        stockService.registerManualAdjustment(
+                request.productUuid(), request.quantity(), request.reason(), principal != null ? principal.user() : null);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping(path = "/movements", produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "List all stock movements (paginated)", operationId = "list-stock-movements")
+    @PreAuthorize("hasAnyRole('ADMIN', 'ATTENDANT')")
+    public ResponseEntity<Page<StockMovementResponse>> listMovements(
+            @RequestParam(required = false) Long productId,
+            @ParameterObject @PageableDefault(size = 20) Pageable pageable) {
+        Page<StockMovement> page = productId != null
+                ? stockService.listMovementsByProduct(productId, pageable)
+                : stockService.listAllMovements(pageable);
+        return ResponseEntity.ok(page.map(movementMapper::toResponse));
+    }
+}

@@ -1,6 +1,6 @@
 package br.com.fiap.pos.tech_challenge.core.integration;
 
-import br.com.fiap.pos.tech_challenge.core.repository.UserRepository;
+import br.com.fiap.pos.tech_challenge.core.application.port.out.UserRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;

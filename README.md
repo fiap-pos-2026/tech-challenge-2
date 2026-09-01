@@ -3,9 +3,9 @@
 > **Tech Challenge — Fase 1 e Fase 2 | Pós Tech FIAP 15SOAT**
 
 Back-end do sistema integrado de atendimento para oficina mecânica, com foco em gestão de ordens de
-serviço, clientes e peças, aplicando **Domain-Driven Design (DDD)** sobre uma **Clean Architecture**,
-com qualidade de software, segurança e, na Fase 2, orquestração em Kubernetes, infraestrutura como
-código e pipeline de CI/CD.
+serviço, clientes e peças, aplicando **Domain-Driven Design (DDD)** sobre uma **Arquitetura
+Hexagonal (Ports & Adapters)**, com qualidade de software, segurança e, na Fase 2, orquestração em
+Kubernetes, infraestrutura como código e pipeline de CI/CD.
 
 ---
 
@@ -23,9 +23,11 @@ O sistema resolve esses problemas permitindo:
 
 ### Objetivos da Fase 2
 
-A Fase 2 evolui o back-end da Fase 1 para atender qualidade, resiliência e escalabilidade sem trocar
-o modelo arquitetural:
+A Fase 2 evolui o back-end da Fase 1 para atender qualidade, resiliência e escalabilidade:
 
+- **Migração para Arquitetura Hexagonal (Ports & Adapters)**: domínio livre de framework
+  (POJOs sem JPA/Hibernate/Bean Validation), persistência e I/O atrás de _ports_ com _adapters_
+  em `infrastructure/`
 - Abertura de OS com serviços e peças opcionais já no ato do cadastro
 - Listagem priorizada de OS (ordem de negócio + exclusão de Finalizada/Entregue por padrão)
 - Notificação do cliente por e-mail a cada mudança de status da OS
@@ -102,30 +104,88 @@ registrada em log e **não** reverte a transição já persistida.
 | Migrations | Liquibase |
 | Segurança | Spring Security + JWT RSA (OAuth2 Resource Server) |
 | Documentação | Springdoc OpenAPI 3 (Swagger UI) |
+| Mapeamento | MapStruct (DTO ↔ domínio, domínio ↔ entidade JPA) |
 | Testes de integração | Testcontainers |
-| Cobertura | JaCoCo (gate ≥ 80% nos domínios críticos) |
+| Cobertura | JaCoCo (gate ≥ 80% LINE na camada `application`) |
 | Orquestração (Fase 2) | Kubernetes (microk8s) via Kustomize |
 | IaC (Fase 2) | Terraform |
 | CI/CD (Fase 2) | GitHub Actions (runners GitHub-hosted e self-hosted) |
 
-### Arquitetura
+### Arquitetura — Hexagonal (Ports & Adapters)
 
-Back-end monolítico em **Clean Architecture** — camadas concêntricas onde regras de negócio não
-dependem de frameworks web ou de persistência:
+Back-end monolítico em **Arquitetura Hexagonal**, aplicando a **Regra de Dependência** da Clean
+Architecture: as setas apontam sempre para dentro (`web` e `infrastructure` dependem de
+`application`, que depende de `domain`; `domain` não depende de ninguém). Na Fase 2 o código da
+Fase 1 (em camadas Spring, com o domínio sendo as próprias entidades JPA) foi migrado para este
+layout.
 
 ```
-controller/   →  Interface adapters: @RestController + DTOs de request/response
-service/      →  Casos de uso / regras de aplicação (@Service)
-domain/       →  Entidades de domínio + enums (núcleo, sem dependência de framework)
-repository/   →  Interfaces Spring Data JPA (porta de saída para persistência)
-security/     →  Filtros JWT, autenticação, autorização por role (infraestrutura)
-validation/   →  @ValidTaxId (CPF/CNPJ), @ValidLicensePlate
-scheduler/    →  Expiração automática de orçamentos (7 dias)
+domain/
+  model/          →  Núcleo: entidades e regras invariantes como POJOs — sem jakarta.persistence,
+                     sem Hibernate, sem Bean Validation. equals/hashCode por identidade de negócio
+  enums/          →  Enums de domínio + EApplicationError (com ErrorStatus próprio, sem HttpStatus)
+  exception/      →  Exceções de negócio (sem org.springframework.*)
+
+application/       →  Camada interna: serviços de aplicação (casos de uso, @Service, @Transactional)
+  port/out/       →  Portas de saída (interfaces): *Repository, MailPort, PasswordHasher,
+                     DomainEventPublisher, TokenBlacklistPort, CurrentActorPort
+  event/          →  ServiceOrderStatusChangedEvent (record neutro)
+  scheduler/      →  Expiração automática de orçamentos (7 dias)
+
+infrastructure/   →  Adapters de saída (frameworks & drivers)
+  persistence/
+    entity/       →  Entidades JPA (*Entity) — todo o mapeamento @Entity/@Column/@ManyToOne/@Version
+    jpa/          →  Interfaces Spring Data (*JpaRepository)
+    adapter/      →  *RepositoryAdapter implements application.port.out.*Repository
+    mapper/       →  PersistenceMapper (MapStruct) domínio ↔ *Entity, com tratamento de ciclo
+                     no agregado Quote
+  security/       →  SecurityConfig, filtros JWT, TokenUtility, UserDetailsImpl (compõe o
+                     domain.model.User, não estende), BCryptPasswordHasher, RedisTokenBlacklist,
+                     AdminCredentialInitializer, SecurityContextCurrentActorAdapter
+  mail/           →  SpringMailAdapter implements MailPort (envolve JavaMailSender)
+  event/          →  SpringDomainEventPublisher; StatusEmailNotifier (@TransactionalEventListener)
+  config/         →  MessageSource, OpenAPI, PasswordEncoder
+
+web/              →  Adapters de entrada
+  controller/     →  @RestController
+  dto/            →  DTOs de request/response (records)
+  mapper/         →  MapStruct DTO ↔ domínio
+  exception/      →  @ControllerAdvice (traduz ErrorStatus → HTTP)
+
+util/  validation/ →  Helpers de borda (Translator, WebUtility, AuthUtility) e validadores
+                      (@ValidTaxId CPF/CNPJ, @ValidLicensePlate)
 ```
 
-A Fase 2 manteve deliberadamente a Clean Architecture já adotada na Fase 1 — **não houve migração
-para Hexagonal/ports-and-adapters**; os gaps de API e a fatia de plataforma (Kustomize, Terraform,
-CI/CD) foram entregues sobre o layout existente.
+```mermaid
+flowchart LR
+  subgraph in["Adapters de entrada (web)"]
+    C[Controllers + DTOs]
+  end
+  subgraph app["application (camada interna)"]
+    UC["Serviços de aplicação (casos de uso)"]
+    P["port/out (interfaces)"]
+  end
+  subgraph dom["domain"]
+    M["model (POJOs) · enums · exception"]
+  end
+  subgraph out["Adapters de saída (infrastructure)"]
+    DB["persistence: JPA + adapters + MapStruct"]
+    MAIL["mail: SpringMailAdapter"]
+    EVT["event: Spring publisher + listener"]
+    SEC["security: JWT · BCrypt · Redis"]
+  end
+  C --> UC
+  UC --> M
+  UC --> P
+  DB -. implements .-> P
+  MAIL -. implements .-> P
+  EVT -. implements .-> P
+  SEC -. implements .-> P
+  DB --> M
+```
+
+**Gate de cobertura (JaCoCo ≥ 80% LINE)** mede o pacote `application.*` (casos de uso) e
+`validation.*`; controllers, adapters, persistência e DTOs ficam fora da métrica.
 
 ### Arquitetura da infraestrutura
 

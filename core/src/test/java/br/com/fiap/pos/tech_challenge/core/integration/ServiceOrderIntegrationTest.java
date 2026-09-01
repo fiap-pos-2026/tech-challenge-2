@@ -1,34 +1,34 @@
 package br.com.fiap.pos.tech_challenge.core.integration;
 
-import br.com.fiap.pos.tech_challenge.core.controller.dto.OpenProductItemRequest;
-import br.com.fiap.pos.tech_challenge.core.controller.dto.ServiceOrderResponse;
-import br.com.fiap.pos.tech_challenge.core.domain.Customer;
-import br.com.fiap.pos.tech_challenge.core.domain.MechanicalService;
-import br.com.fiap.pos.tech_challenge.core.domain.Product;
-import br.com.fiap.pos.tech_challenge.core.domain.ServiceOrder;
-import br.com.fiap.pos.tech_challenge.core.domain.Vehicle;
-import br.com.fiap.pos.tech_challenge.core.enums.DocumentType;
-import br.com.fiap.pos.tech_challenge.core.enums.MeasurementUnit;
-import br.com.fiap.pos.tech_challenge.core.enums.ProductType;
-import br.com.fiap.pos.tech_challenge.core.enums.ServiceOrderStatus;
-import br.com.fiap.pos.tech_challenge.core.exception.CustomerNotFoundException;
-import br.com.fiap.pos.tech_challenge.core.exception.ProductNotFoundException;
-import br.com.fiap.pos.tech_challenge.core.exception.VehicleNotFoundException;
-import br.com.fiap.pos.tech_challenge.core.repository.CustomerRepository;
-import br.com.fiap.pos.tech_challenge.core.repository.MechanicalServiceRepository;
-import br.com.fiap.pos.tech_challenge.core.repository.ProductRepository;
-import br.com.fiap.pos.tech_challenge.core.repository.QuoteRepository;
-import br.com.fiap.pos.tech_challenge.core.repository.ServiceOrderRepository;
-import br.com.fiap.pos.tech_challenge.core.repository.VehicleRepository;
-import br.com.fiap.pos.tech_challenge.core.service.OTPService;
-import br.com.fiap.pos.tech_challenge.core.service.ServiceOrderService;
+import br.com.fiap.pos.tech_challenge.core.web.dto.OpenProductItemRequest;
+import br.com.fiap.pos.tech_challenge.core.web.dto.ServiceOrderResponse;
+import br.com.fiap.pos.tech_challenge.core.domain.model.Customer;
+import br.com.fiap.pos.tech_challenge.core.domain.model.MechanicalService;
+import br.com.fiap.pos.tech_challenge.core.domain.model.Product;
+import br.com.fiap.pos.tech_challenge.core.domain.model.ServiceOrder;
+import br.com.fiap.pos.tech_challenge.core.domain.model.Vehicle;
+import br.com.fiap.pos.tech_challenge.core.domain.enums.DocumentType;
+import br.com.fiap.pos.tech_challenge.core.domain.enums.MeasurementUnit;
+import br.com.fiap.pos.tech_challenge.core.domain.enums.ProductType;
+import br.com.fiap.pos.tech_challenge.core.domain.enums.ServiceOrderStatus;
+import br.com.fiap.pos.tech_challenge.core.domain.exception.CustomerNotFoundException;
+import br.com.fiap.pos.tech_challenge.core.domain.exception.ProductNotFoundException;
+import br.com.fiap.pos.tech_challenge.core.domain.exception.VehicleNotFoundException;
+import br.com.fiap.pos.tech_challenge.core.application.port.out.CustomerRepository;
+import br.com.fiap.pos.tech_challenge.core.application.port.out.MechanicalServiceRepository;
+import br.com.fiap.pos.tech_challenge.core.application.port.out.ProductRepository;
+import br.com.fiap.pos.tech_challenge.core.application.port.out.QuoteRepository;
+import br.com.fiap.pos.tech_challenge.core.application.port.out.ServiceOrderRepository;
+import br.com.fiap.pos.tech_challenge.core.application.port.out.VehicleRepository;
+import br.com.fiap.pos.tech_challenge.core.application.OTPService;
+import br.com.fiap.pos.tech_challenge.core.application.ServiceOrderService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.http.HttpStatus;
+import br.com.fiap.pos.tech_challenge.core.domain.exception.ErrorStatus;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
@@ -149,7 +149,7 @@ class ServiceOrderIntegrationTest extends BaseIntegrationTest {
                 List.of(new OpenProductItemRequest(UUID.randomUUID(), BigDecimal.ONE))))
                 .isInstanceOf(ProductNotFoundException.class)
                 .extracting(e -> ((ProductNotFoundException) e).getStatus())
-                .isEqualTo(HttpStatus.NOT_FOUND);
+                .isEqualTo(ErrorStatus.NOT_FOUND);
 
         assertThat(serviceOrderRepository.count()).isZero();
     }
@@ -160,7 +160,7 @@ class ServiceOrderIntegrationTest extends BaseIntegrationTest {
                 UUID.randomUUID(), vehicle.getUuid(), "Barulho no motor"))
                 .isInstanceOf(CustomerNotFoundException.class)
                 .extracting(e -> ((CustomerNotFoundException) e).getStatus())
-                .isEqualTo(HttpStatus.NOT_FOUND);
+                .isEqualTo(ErrorStatus.NOT_FOUND);
 
         assertThat(serviceOrderRepository.count()).isZero();
     }
@@ -171,7 +171,7 @@ class ServiceOrderIntegrationTest extends BaseIntegrationTest {
                 customer.getUuid(), UUID.randomUUID(), "Barulho no motor"))
                 .isInstanceOf(VehicleNotFoundException.class)
                 .extracting(e -> ((VehicleNotFoundException) e).getStatus())
-                .isEqualTo(HttpStatus.NOT_FOUND);
+                .isEqualTo(ErrorStatus.NOT_FOUND);
 
         assertThat(serviceOrderRepository.count()).isZero();
     }
