@@ -37,8 +37,6 @@ class MechanicalServiceServiceTest {
 
     @InjectMocks MechanicalServiceService sut;
 
-    // ---- create ----
-
     @Test
     void create_savesAndReturnsResponse() {
         CreateServiceRequest req = new CreateServiceRequest("Troca de óleo", null, new BigDecimal("150.00"), 60);
@@ -52,8 +50,6 @@ class MechanicalServiceServiceTest {
         assertThat(sut.create(req)).isEqualTo(resp);
         verify(repository).save(entity);
     }
-
-    // ---- update ----
 
     @Test
     void update_appliesChangesAndReturns() {
@@ -78,8 +74,6 @@ class MechanicalServiceServiceTest {
         assertThatThrownBy(() -> sut.update(uuid, new CreateServiceRequest("x", null, BigDecimal.TEN, 30)))
                 .isInstanceOf(MechanicalServiceNotFoundException.class);
     }
-
-    // ---- delete ----
 
     @Test
     void delete_removesWhenNotInActiveOrder() {
@@ -118,8 +112,6 @@ class MechanicalServiceServiceTest {
                 .isInstanceOf(MechanicalServiceNotFoundException.class);
     }
 
-    // ---- findAll ----
-
     @Test
     void findAll_returnsMappedPage() {
         MechanicalService entity = new MechanicalService();
@@ -130,8 +122,6 @@ class MechanicalServiceServiceTest {
 
         assertThat(page.getContent()).hasSize(1);
     }
-
-    // ---- findByUuid ----
 
     @Test
     void findByUuid_returnsResponse() {
@@ -154,8 +144,6 @@ class MechanicalServiceServiceTest {
                 .isInstanceOf(MechanicalServiceNotFoundException.class);
     }
 
-    // ---- findAvgDurations ----
-
     @Test
     void findAvgDurations_delegatesToRepository() {
         when(repository.findAvgDurationByService(any())).thenReturn(List.of());
@@ -166,7 +154,6 @@ class MechanicalServiceServiceTest {
         verify(repository).findAvgDurationByService(any());
     }
 
-    // ---- helper ----
     private MechanicalServiceResponse serviceResponse() {
         return new MechanicalServiceResponse(UUID.randomUUID(), "Troca de óleo", null, new BigDecimal("150.00"), 60);
     }

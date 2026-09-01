@@ -15,7 +15,6 @@ public interface MechanicalServiceRepository {
     Optional<MechanicalService> findByUuid(UUID uuid);
     Page<MechanicalService> findAll(Pageable pageable);
     boolean existsByIdAndServiceOrders_StatusIn(Long id, Collection<ServiceOrderStatus> statuses);
-    // TODO Fase D: substituir ServiceAvgDurationResponse por projecao neutra em application
     List<ServiceAvgDurationResponse> findAvgDurationByService(Collection<ServiceOrderStatus> completedStatuses);
     MechanicalService save(MechanicalService service);
     void deleteById(Long id);

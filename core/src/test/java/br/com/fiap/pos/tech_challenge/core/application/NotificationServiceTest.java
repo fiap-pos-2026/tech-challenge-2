@@ -39,8 +39,6 @@ class NotificationServiceTest {
 
     @InjectMocks NotificationService sut;
 
-    // ---- publish ----
-
     @Test
     void publish_savesNotificationWithAllFields() {
         User user = new User();
@@ -56,8 +54,6 @@ class NotificationServiceTest {
         assertThat(saved.getMessage()).isEqualTo("orçamento expirado");
         assertThat(saved.getServiceOrderRef()).isSameAs(so);
     }
-
-    // ---- publishToRole ----
 
     @Test
     void publishToRole_publishesToAllUsersWithRole() {
@@ -79,8 +75,6 @@ class NotificationServiceTest {
         verify(repository, never()).save(any());
     }
 
-    // ---- publishInsufficientStockNotification ----
-
     @Test
     void publishInsufficientStockNotification_publishesToAttendants() {
         User attendant = new User();
@@ -90,8 +84,6 @@ class NotificationServiceTest {
 
         verify(repository).save(any(Notification.class));
     }
-
-    // ---- markAsRead ----
 
     @Test
     void markAsRead_setsReadAndReadAt() {
@@ -117,8 +109,6 @@ class NotificationServiceTest {
                 .isInstanceOf(CoreException.class);
     }
 
-    // ---- listByUser ----
-
     @Test
     void listByUser_delegatesToRepository() {
         when(repository.findByUserIdOrderByCreatedAtDesc(eq(1L), any(Pageable.class)))
@@ -128,8 +118,6 @@ class NotificationServiceTest {
 
         verify(repository).findByUserIdOrderByCreatedAtDesc(eq(1L), any());
     }
-
-    // ---- cleanupOldReadNotifications ----
 
     @Test
     void cleanupOldReadNotifications_deletesOldRead() {

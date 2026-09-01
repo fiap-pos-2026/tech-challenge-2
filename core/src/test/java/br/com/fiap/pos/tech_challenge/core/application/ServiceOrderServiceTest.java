@@ -66,9 +66,6 @@ class ServiceOrderServiceTest {
         ReflectionTestUtils.setField(sut, "reworkHourlyRate", new BigDecimal("150.00"));
     }
 
-    // -------------------------------------------------------------------------
-    // openServiceOrder
-    // -------------------------------------------------------------------------
     @Test
     void openServiceOrder_createsOrderWithStatusReceived() {
         UUID customerUuid = UUID.randomUUID();
@@ -251,9 +248,6 @@ class ServiceOrderServiceTest {
         assertThat(event.customerName()).isEqualTo("Cliente Teste");
     }
 
-    // -------------------------------------------------------------------------
-    // startDiagnosis
-    // -------------------------------------------------------------------------
     @Test
     void startDiagnosis_transitionsFromReceivedToInDiagnosis() {
         UUID uuid = UUID.randomUUID();
@@ -285,9 +279,6 @@ class ServiceOrderServiceTest {
                 .isInstanceOf(InvalidStatusTransitionException.class);
     }
 
-    // -------------------------------------------------------------------------
-    // getServiceOrder
-    // -------------------------------------------------------------------------
     @Test
     void getServiceOrder_returnsResponseWithQuote() {
         UUID uuid = UUID.randomUUID();
@@ -314,9 +305,6 @@ class ServiceOrderServiceTest {
                 .isInstanceOf(ServiceOrderNotFoundException.class);
     }
 
-    // -------------------------------------------------------------------------
-    // listServiceOrders
-    // -------------------------------------------------------------------------
     @Test
     void listServiceOrders_filtersByStatusWhenProvided() {
         ServiceOrder so = serviceOrderWithStatus(ServiceOrderStatus.RECEIVED);
@@ -401,9 +389,6 @@ class ServiceOrderServiceTest {
         assertThat(captor.getValue().getPageSize()).isEqualTo(15);
     }
 
-    // -------------------------------------------------------------------------
-    // resendOTP
-    // -------------------------------------------------------------------------
     @Test
     void resendOTP_invalidatesAndSendsNewToken() {
         UUID uuid = UUID.randomUUID();
@@ -438,9 +423,6 @@ class ServiceOrderServiceTest {
                 .isInstanceOf(InvalidStatusTransitionException.class);
     }
 
-    // -------------------------------------------------------------------------
-    // completeExecution
-    // -------------------------------------------------------------------------
     @Test
     void completeExecution_transitionsToCompleted() {
         UUID uuid = UUID.randomUUID();
@@ -472,9 +454,6 @@ class ServiceOrderServiceTest {
                 .isInstanceOf(InvalidStatusTransitionException.class);
     }
 
-    // -------------------------------------------------------------------------
-    // returnProduct — reauth check
-    // -------------------------------------------------------------------------
     @Test
     void returnProduct_callsValidatePasswordAndCreditStock() {
         UUID osUuid = UUID.randomUUID();
@@ -510,9 +489,6 @@ class ServiceOrderServiceTest {
         verify(stockService).credit(eq(productUuid), eq(BigDecimal.TWO), eq(so), any());
     }
 
-    // -------------------------------------------------------------------------
-    // closeDispute — status guards
-    // -------------------------------------------------------------------------
     @Test
     void closeDispute_throwsFromTerminalStatus() {
         UUID uuid = UUID.randomUUID();
@@ -544,9 +520,6 @@ class ServiceOrderServiceTest {
         assertThat(event.newStatus()).isEqualTo(ServiceOrderStatus.DISPUTED);
     }
 
-    // -------------------------------------------------------------------------
-    // openServiceOrder — vehicle ownership
-    // -------------------------------------------------------------------------
     @Test
     void openServiceOrder_throwsWhenVehicleDoesNotBelongToCustomer() {
         UUID customerUuid = UUID.randomUUID();
@@ -568,9 +541,6 @@ class ServiceOrderServiceTest {
                 .isInstanceOf(CoreException.class);
     }
 
-    // -------------------------------------------------------------------------
-    // startDiagnosis — terminal status guards
-    // -------------------------------------------------------------------------
     @Test
     void startDiagnosis_throwsFromCancelledStatus() {
         UUID uuid = UUID.randomUUID();
@@ -581,9 +551,6 @@ class ServiceOrderServiceTest {
                 .isInstanceOf(InvalidStatusTransitionException.class);
     }
 
-    // -------------------------------------------------------------------------
-    // returnProduct — stock service propagates ReturnNotAllowedException
-    // -------------------------------------------------------------------------
     @Test
     void returnProduct_propagatesReturnNotAllowedException() {
         UUID osUuid = UUID.randomUUID();
@@ -616,9 +583,6 @@ class ServiceOrderServiceTest {
                 .isInstanceOf(ReturnNotAllowedException.class);
     }
 
-    // -------------------------------------------------------------------------
-    // approveQuote — first approval debits all budgeted products
-    // -------------------------------------------------------------------------
     @Test
     void approveQuote_debitsAllBudgetedProductsOnFirstApproval() {
         UUID uuid = UUID.randomUUID();
@@ -654,9 +618,6 @@ class ServiceOrderServiceTest {
         assertThat(event.newStatus()).isEqualTo(ServiceOrderStatus.IN_PROGRESS);
     }
 
-    // -------------------------------------------------------------------------
-    // approveQuote — addendum path clears unbudgeted flag, no extra debit
-    // -------------------------------------------------------------------------
     @Test
     void approveQuote_clearsUnbudgetedLinesOnAddendum() {
         UUID uuid = UUID.randomUUID();
@@ -690,9 +651,6 @@ class ServiceOrderServiceTest {
         verify(quoteRepository).save(quote);
     }
 
-    // -------------------------------------------------------------------------
-    // approveQuote — unbudgeted line present at first approval is NOT debited again
-    // -------------------------------------------------------------------------
     @Test
     void approveQuote_doesNotDebitUnbudgetedLineOnFirstApproval() {
         UUID uuid = UUID.randomUUID();
@@ -723,9 +681,6 @@ class ServiceOrderServiceTest {
         verify(stockService, never()).debit(any(), any(), any(), any());
     }
 
-    // -------------------------------------------------------------------------
-    // requestProduct — rejected during initial AWAITING_APPROVAL (quote not yet approved)
-    // -------------------------------------------------------------------------
     @Test
     void requestProduct_throwsWhenCalledDuringInitialAwaitingApproval() {
         UUID osUuid = UUID.randomUUID();
@@ -744,9 +699,6 @@ class ServiceOrderServiceTest {
         verify(stockService, never()).debit(any(), any(), any(), any());
     }
 
-    // -------------------------------------------------------------------------
-    // rejectQuote — initial rejection cancels the order
-    // -------------------------------------------------------------------------
     @Test
     void rejectQuote_cancelledWhenNoUnbudgetedLines() {
         UUID uuid = UUID.randomUUID();
@@ -771,9 +723,6 @@ class ServiceOrderServiceTest {
         assertThat(event.newStatus()).isEqualTo(ServiceOrderStatus.CANCELLED);
     }
 
-    // -------------------------------------------------------------------------
-    // rejectQuote — addendum rejection compensates stock and resumes IN_PROGRESS
-    // -------------------------------------------------------------------------
     @Test
     void rejectQuote_compensatesStockAndResumesWhenAddendum() {
         UUID uuid = UUID.randomUUID();
@@ -816,9 +765,6 @@ class ServiceOrderServiceTest {
         assertThat(event.newStatus()).isEqualTo(ServiceOrderStatus.IN_PROGRESS);
     }
 
-    // -----------------------------------------------------------------------
-    // addServiceToDiagnosis
-    // -----------------------------------------------------------------------
     @Test
     void addServiceToDiagnosis_addsServiceLineToQuote() {
         UUID osUuid = UUID.randomUUID();
@@ -858,9 +804,6 @@ class ServiceOrderServiceTest {
                 .isInstanceOf(br.com.fiap.pos.tech_challenge.core.domain.exception.MechanicalServiceNotFoundException.class);
     }
 
-    // -----------------------------------------------------------------------
-    // addProductToDiagnosis
-    // -----------------------------------------------------------------------
     @Test
     void addProductToDiagnosis_addsProductLineToQuote() {
         UUID osUuid = UUID.randomUUID();
@@ -920,9 +863,6 @@ class ServiceOrderServiceTest {
         verify(quoteRepository, never()).save(any());
     }
 
-    // -----------------------------------------------------------------------
-    // removeProductFromDiagnosis
-    // -----------------------------------------------------------------------
     @Test
     void removeProductFromDiagnosis_removesLineAndRecalculates() {
         UUID osUuid = UUID.randomUUID();
@@ -970,9 +910,6 @@ class ServiceOrderServiceTest {
                 .isInstanceOf(br.com.fiap.pos.tech_challenge.core.domain.exception.ProductNotFoundException.class);
     }
 
-    // -----------------------------------------------------------------------
-    // acceptDelivery
-    // -----------------------------------------------------------------------
     @Test
     void acceptDelivery_byAttendant_transitionsToDelivered() {
         UUID uuid = UUID.randomUUID();
@@ -1010,9 +947,6 @@ class ServiceOrderServiceTest {
         assertThat(so.getStatus()).isEqualTo(ServiceOrderStatus.DELIVERED);
     }
 
-    // -----------------------------------------------------------------------
-    // rejectDelivery
-    // -----------------------------------------------------------------------
     @Test
     void rejectDelivery_resumesInProgressAndCreatesReworkCycle() {
         UUID uuid = UUID.randomUUID();
@@ -1041,9 +975,6 @@ class ServiceOrderServiceTest {
         assertThat(event.newStatus()).isEqualTo(ServiceOrderStatus.IN_PROGRESS);
     }
 
-    // -----------------------------------------------------------------------
-    // getServiceOrderStatus
-    // -----------------------------------------------------------------------
     @Test
     void getServiceOrderStatus_returnsStatusResponse() {
         UUID uuid = UUID.randomUUID();
@@ -1058,9 +989,6 @@ class ServiceOrderServiceTest {
         assertThat(result.status()).isEqualTo(ServiceOrderStatus.IN_PROGRESS);
     }
 
-    // -----------------------------------------------------------------------
-    // getServiceOrder
-    // -----------------------------------------------------------------------
     @Test
     void getServiceOrder_returnsResponse() {
         UUID uuid = UUID.randomUUID();
@@ -1073,9 +1001,6 @@ class ServiceOrderServiceTest {
         assertThat(sut.getServiceOrder(uuid)).isEqualTo(expected);
     }
 
-    // -----------------------------------------------------------------------
-    // removeServiceFromDiagnosis
-    // -----------------------------------------------------------------------
     @Test
     void removeServiceFromDiagnosis_removesLineAndRecalculates() {
         UUID osUuid = UUID.randomUUID();
@@ -1122,9 +1047,6 @@ class ServiceOrderServiceTest {
                 .isInstanceOf(MechanicalServiceNotFoundException.class);
     }
 
-    // -----------------------------------------------------------------------
-    // completeDiagnosis
-    // -----------------------------------------------------------------------
     @Test
     void completeDiagnosis_transitionsToAwaitingApprovalAndSendsOTP() {
         UUID uuid = UUID.randomUUID();
@@ -1160,9 +1082,6 @@ class ServiceOrderServiceTest {
                 .isInstanceOf(InvalidStatusTransitionException.class);
     }
 
-    // -----------------------------------------------------------------------
-    // requestProduct
-    // -----------------------------------------------------------------------
     @Test
     void requestProduct_debitsAndTriggersApprovalWhenInProgress() {
         UUID osUuid = UUID.randomUUID();
@@ -1271,9 +1190,6 @@ class ServiceOrderServiceTest {
         verify(notificationService).publishInsufficientStockNotification(any(), eq(so));
     }
 
-    // -----------------------------------------------------------------------
-    // closeDispute — from IN_PROGRESS
-    // -----------------------------------------------------------------------
     @Test
     void closeDispute_succeedsFromInProgressStatus() {
         UUID uuid = UUID.randomUUID();
@@ -1290,9 +1206,6 @@ class ServiceOrderServiceTest {
         assertThat(result).isNotNull();
     }
 
-    // -----------------------------------------------------------------------
-    // approveQuote — debit throws InsufficientStockException (fail-open)
-    // -----------------------------------------------------------------------
     @Test
     void approveQuote_notifiesAndContinuesWhenDebitThrowsInsufficientStock() {
         UUID uuid = UUID.randomUUID();
@@ -1324,9 +1237,6 @@ class ServiceOrderServiceTest {
         assertThat(result).isNotNull();
     }
 
-    // -----------------------------------------------------------------------
-    // returnProduct — product not in quote
-    // -----------------------------------------------------------------------
     @Test
     void returnProduct_throwsWhenProductNotInQuote() {
         UUID osUuid = UUID.randomUUID();
@@ -1346,9 +1256,6 @@ class ServiceOrderServiceTest {
                 .isInstanceOf(ProductNotFoundException.class);
     }
 
-    // -----------------------------------------------------------------------
-    // Helpers
-    // -----------------------------------------------------------------------
     private ServiceOrder serviceOrderWithStatus(ServiceOrderStatus status) {
         ServiceOrder so = new ServiceOrder();
         so.setStatus(status);

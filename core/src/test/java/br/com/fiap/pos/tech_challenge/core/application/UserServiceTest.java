@@ -53,8 +53,6 @@ class UserServiceTest {
         lenient().when(currentActorPort.currentUser()).thenReturn(Optional.of(admin));
     }
 
-    // ---- loadUserByUsername ----
-
     @Test
     void loadUserByUsername_returnsUserDetailsWhenFound() {
         User user = user("atendente");
@@ -74,8 +72,6 @@ class UserServiceTest {
                 .isInstanceOf(CoreException.class);
     }
 
-    // ---- findAll ----
-
     @Test
     void findAll_delegatesToRepository() {
         when(repository.findAll()).thenReturn(List.of(user("a")));
@@ -83,8 +79,6 @@ class UserServiceTest {
 
         assertThat(sut.findAll()).hasSize(1);
     }
-
-    // ---- findByUuid ----
 
     @Test
     void findByUuid_returnsDTO() {
@@ -104,8 +98,6 @@ class UserServiceTest {
         assertThatThrownBy(() -> sut.findByUuid(uuid))
                 .isInstanceOf(CoreException.class);
     }
-
-    // ---- create / validate ----
 
     @Test
     void create_savesAndReturnsDTO() {
@@ -142,8 +134,6 @@ class UserServiceTest {
                 .isInstanceOf(CoreException.class);
     }
 
-    // ---- deleteByUuid ----
-
     @Test
     void deleteByUuid_removesWhenExists() {
         UUID uuid = UUID.randomUUID();
@@ -164,8 +154,6 @@ class UserServiceTest {
         assertThatThrownBy(() -> sut.deleteByUuid(uuid))
                 .isInstanceOf(CoreException.class);
     }
-
-    // ---- update ----
 
     @Test
     void update_appliesChangesAndReturns() {
@@ -214,8 +202,6 @@ class UserServiceTest {
                 .isInstanceOf(CoreException.class);
     }
 
-    // ---- changePassword ----
-
     @Test
     void changePassword_succeedsAndClearsLockout() {
         User u = user("joao");
@@ -255,15 +241,12 @@ class UserServiceTest {
         User u = user("joao");
         u.setId(1L);
         when(repository.findById(1L)).thenReturn(Optional.of(u));
-        // both calls use same args → single stub covers current-matches + new-same-as-current check
         when(passwordHasher.matches("senhaAtual", "hash")).thenReturn(true);
 
         assertThatThrownBy(() ->
                 sut.changePassword(1L, new br.com.fiap.pos.tech_challenge.core.web.dto.ChangePasswordDTO("senhaAtual", "senhaAtual")))
                 .isInstanceOf(CoreException.class);
     }
-
-    // ---- deleteByUuid — last admin guard ----
 
     @Test
     void deleteByUuid_throwsWhenDeletingLastAdmin() {
@@ -278,8 +261,6 @@ class UserServiceTest {
                 .isInstanceOf(CoreException.class);
         verify(repository, never()).deleteById(any());
     }
-
-    // ---- changePassword — lockout edge cases ----
 
     @Test
     void changePassword_throwsWhenAccountIsLocked() {
@@ -311,8 +292,6 @@ class UserServiceTest {
         verify(repository).save(u);
     }
 
-    // ---- getLoggedUser ----
-
     @Test
     void getLoggedUser_returnsCurrentUserDTO() {
         User entity = user("admin");
@@ -330,8 +309,6 @@ class UserServiceTest {
         assertThatThrownBy(() -> sut.getLoggedUser())
                 .isInstanceOf(CoreException.class);
     }
-
-    // ---- update — role change audit + self-role guard ----
 
     @Test
     void update_logsAuditWhenRoleChanges() {
@@ -367,8 +344,6 @@ class UserServiceTest {
         verify(repository, never()).save(any());
     }
 
-    // ---- findByLogin ----
-
     @Test
     void findByLogin_returnsUserWhenFound() {
         User user = user("atendente");
@@ -385,8 +360,6 @@ class UserServiceTest {
                 .isInstanceOf(CoreException.class);
     }
 
-    // ---- saveLoginState / updateLastLogin ----
-
     @Test
     void saveLoginState_delegatesToRepository() {
         User user = user("x");
@@ -400,7 +373,6 @@ class UserServiceTest {
         verify(repository).updateLastLogin(1L);
     }
 
-    // ---- helpers ----
     private User user(String login) {
         User u = new User();
         u.setLogin(login);

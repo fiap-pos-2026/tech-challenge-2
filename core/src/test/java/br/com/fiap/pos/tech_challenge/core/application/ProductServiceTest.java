@@ -40,8 +40,6 @@ class ProductServiceTest {
 
     @InjectMocks ProductService sut;
 
-    // ---- create ----
-
     @Test
     void create_savesAndReturnsResponse() {
         CreateProductRequest req = productRequest();
@@ -55,8 +53,6 @@ class ProductServiceTest {
         assertThat(sut.create(req)).isEqualTo(resp);
         verify(repository).save(entity);
     }
-
-    // ---- update ----
 
     @Test
     void update_appliesChangesAndReturns() {
@@ -80,8 +76,6 @@ class ProductServiceTest {
         assertThatThrownBy(() -> sut.update(uuid, productRequest()))
                 .isInstanceOf(ProductNotFoundException.class);
     }
-
-    // ---- delete ----
 
     @Test
     void delete_removesWhenNotInActiveOrder() {
@@ -119,8 +113,6 @@ class ProductServiceTest {
                 .isInstanceOf(ProductNotFoundException.class);
     }
 
-    // ---- findAll ----
-
     @Test
     void findAll_returnsMappedPage() {
         Product entity = new Product();
@@ -129,8 +121,6 @@ class ProductServiceTest {
 
         assertThat(sut.findAll(Pageable.unpaged()).getContent()).hasSize(1);
     }
-
-    // ---- findByUuid ----
 
     @Test
     void findByUuid_returnsResponse() {
@@ -151,8 +141,6 @@ class ProductServiceTest {
                 .isInstanceOf(ProductNotFoundException.class);
     }
 
-    // ---- findEntityByUuid ----
-
     @Test
     void findEntityByUuid_returnsEntity() {
         UUID uuid = UUID.randomUUID();
@@ -171,7 +159,6 @@ class ProductServiceTest {
                 .isInstanceOf(ProductNotFoundException.class);
     }
 
-    // ---- helpers ----
     private CreateProductRequest productRequest() {
         return new CreateProductRequest("Óleo 5W30", null, ProductType.SUPPLY, MeasurementUnit.LITER,
                 new BigDecimal("45.00"), new BigDecimal("100"), true);

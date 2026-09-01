@@ -137,7 +137,6 @@ class InventoryIntegrationTest extends BaseIntegrationTest {
     void compensation_increasesQuantityAndCreatesCompensationMovement_withoutCheckingReturnable() {
         BigDecimal quantity = new BigDecimal("2.0000");
 
-        // nonReturnableProduct.returnable == false, but compensate() must NOT check returnable
         stockService.compensate(nonReturnableProduct.getUuid(), quantity, null, operator);
 
         Product updated = productRepository.findByUuid(nonReturnableProduct.getUuid()).orElseThrow();
@@ -159,13 +158,11 @@ class InventoryIntegrationTest extends BaseIntegrationTest {
         BigDecimal originalQuantity = movement.getQuantity();
         MovementType originalType = movement.getType();
 
-        // Attempt to mutate and persist — the persistence entity marks these columns
-        // updatable=false, so the change must not reach the database.
+        // columns are updatable=false — the mutation must not reach the database
         movement.setQuantity(new BigDecimal("999.0000"));
         movement.setType(MovementType.CREDIT);
         stockMovementRepository.save(movement);
 
-        // Clear L1 cache so the next load hits the database, not the in-memory entity
         entityManager.clear();
 
         StockMovement reloaded = stockMovementRepository.findById(movement.getId()).orElseThrow();

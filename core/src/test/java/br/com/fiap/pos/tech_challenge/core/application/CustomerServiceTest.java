@@ -37,8 +37,6 @@ class CustomerServiceTest {
 
     @InjectMocks CustomerService sut;
 
-    // ---- register ----
-
     @Test
     void register_savesAndReturnsResponse() {
         CreateCustomerRequest req = new CreateCustomerRequest(DocumentType.CPF, "52998224725", "João", "joao@mail.com", null);
@@ -66,8 +64,6 @@ class CustomerServiceTest {
         verify(repository, never()).save(any());
     }
 
-    // ---- findByUuid ----
-
     @Test
     void findByUuid_returnsResponseWhenFound() {
         UUID uuid = UUID.randomUUID();
@@ -89,8 +85,6 @@ class CustomerServiceTest {
                 .isInstanceOf(CustomerNotFoundException.class);
     }
 
-    // ---- findFullDocument ----
-
     @Test
     void findFullDocument_returnsDocument() {
         UUID uuid = UUID.randomUUID();
@@ -110,8 +104,6 @@ class CustomerServiceTest {
                 .isInstanceOf(CustomerNotFoundException.class);
     }
 
-    // ---- findByDocument ----
-
     @Test
     void findByDocument_returnsResponse() {
         Customer entity = new Customer();
@@ -130,8 +122,6 @@ class CustomerServiceTest {
                 .isInstanceOf(CustomerNotFoundException.class);
     }
 
-    // ---- validateExistence ----
-
     @Test
     void validateExistence_throwsWhenNotFound() {
         when(repository.existsById(99L)).thenReturn(false);
@@ -146,8 +136,6 @@ class CustomerServiceTest {
 
         sut.validateExistence(1L); // no exception
     }
-
-    // ---- update ----
 
     @Test
     void update_appliesChangesAndReturns() {
@@ -172,8 +160,6 @@ class CustomerServiceTest {
         assertThatThrownBy(() -> sut.update(uuid, new UpdateCustomerRequest("x", "x@x.com", null)))
                 .isInstanceOf(CustomerNotFoundException.class);
     }
-
-    // ---- delete ----
 
     @Test
     void delete_removesCustomerWhenNoActiveOrders() {
@@ -212,8 +198,6 @@ class CustomerServiceTest {
                 .isInstanceOf(CustomerNotFoundException.class);
     }
 
-    // ---- findEntityByUuid ----
-
     @Test
     void findEntityByUuid_returnsEntity() {
         UUID uuid = UUID.randomUUID();
@@ -232,7 +216,6 @@ class CustomerServiceTest {
                 .isInstanceOf(CustomerNotFoundException.class);
     }
 
-    // ---- helper ----
     private CustomerResponse customerResponse() {
         return new CustomerResponse(UUID.randomUUID(), null, "***", "João", "joao@mail.com", null, null);
     }

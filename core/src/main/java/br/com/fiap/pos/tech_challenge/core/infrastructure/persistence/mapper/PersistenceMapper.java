@@ -11,65 +11,47 @@ import org.mapstruct.ReportingPolicy;
 
 import java.util.List;
 
-/**
- * Bidirectional mapping between framework-free domain models and JPA persistence entities.
- * One interface so MapStruct resolves every nested aggregate mapping internally. The
- * {@code Quote} aggregate is a parent/child cycle: the child {@code quote} back-reference
- * is ignored during mapping and restored in {@link #link(QuoteEntity)} / {@link #link(Quote)}.
- */
 @Mapper(
         componentModel = MappingConstants.ComponentModel.SPRING,
-        unmappedTargetPolicy = ReportingPolicy.IGNORE
+        unmappedTargetPolicy = ReportingPolicy.ERROR
 )
 public interface PersistenceMapper {
 
-    // ---- Customer ----
     CustomerEntity toEntity(Customer model);
     Customer toDomain(CustomerEntity entity);
 
-    // ---- Vehicle ----
     VehicleEntity toEntity(Vehicle model);
     Vehicle toDomain(VehicleEntity entity);
 
-    // ---- Product ----
     ProductEntity toEntity(Product model);
     Product toDomain(ProductEntity entity);
 
-    // ---- MechanicalService ----
     MechanicalServiceEntity toEntity(MechanicalService model);
     MechanicalService toDomain(MechanicalServiceEntity entity);
 
-    // ---- User ----
     UserEntity toEntity(User model);
     User toDomain(UserEntity entity);
 
-    // ---- SecurityAuditLog ----
     SecurityAuditLogEntity toEntity(SecurityAuditLog model);
     SecurityAuditLog toDomain(SecurityAuditLogEntity entity);
 
-    // ---- Notification ----
     NotificationEntity toEntity(Notification model);
     Notification toDomain(NotificationEntity entity);
 
-    // ---- OTPToken ----
     OTPTokenEntity toEntity(OTPToken model);
     OTPToken toDomain(OTPTokenEntity entity);
 
-    // ---- StockMovement ----
     StockMovementEntity toEntity(StockMovement model);
     StockMovement toDomain(StockMovementEntity entity);
 
-    // ---- ReworkCycle ----
     ReworkCycleEntity toEntity(ReworkCycle model);
     ReworkCycle toDomain(ReworkCycleEntity entity);
 
-    // ---- ServiceOrder ----
     ServiceOrderEntity toEntity(ServiceOrder model);
     ServiceOrder toDomain(ServiceOrderEntity entity);
     List<ServiceOrder> toServiceOrderDomain(List<ServiceOrderEntity> entities);
     List<ServiceOrderEntity> toServiceOrderEntity(List<ServiceOrder> models);
 
-    // ---- Quote aggregate (parent/child cycle) ----
     @Mapping(target = "quote", ignore = true)
     QuoteProductLineEntity toEntity(QuoteProductLine model);
     @Mapping(target = "quote", ignore = true)

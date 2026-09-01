@@ -56,7 +56,7 @@ tasks.jacocoTestReport {
                     "**/enums/**",
                     "**/domain/**",
                     "**/*Application*",
-                    "**/*Mapper*"
+                    "**/*MapperImpl*"
                 )
             }
         })
@@ -67,11 +67,21 @@ tasks.jacocoTestCoverageVerification {
     dependsOn(tasks.jacocoTestReport)
     violationRules {
         rule {
-            // measure only the application layer (use cases + scheduler) and validators
-            // (excludes controllers, adapters, persistence, DTOs)
+            element = "PACKAGE"
             includes = listOf(
                 "br.com.fiap.pos.tech_challenge.core.application.*",
                 "br.com.fiap.pos.tech_challenge.core.validation.*"
+            )
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = "0.80".toBigDecimal()
+            }
+        }
+        rule {
+            element = "PACKAGE"
+            includes = listOf(
+                "br.com.fiap.pos.tech_challenge.core.infrastructure.persistence.adapter"
             )
             limit {
                 counter = "LINE"

@@ -11,11 +11,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Spring Security principal. Composes a framework-free {@link User} domain model instead of
- * extending it, so the domain never depends on Spring Security. The former getter surface is
- * kept (delegating to {@link #user()}) so existing callers and tests are unaffected.
- */
 @NullMarked
 public class UserDetailsImpl implements UserDetails {
 
@@ -25,12 +20,9 @@ public class UserDetailsImpl implements UserDetails {
         this.user = new User(user);
     }
 
-    /** The underlying domain model. */
     public User user() {
         return user;
     }
-
-    // ---- UserDetails ----
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
@@ -54,8 +46,6 @@ public class UserDetailsImpl implements UserDetails {
     public boolean isEnabled() {
         return user.isActive();
     }
-
-    // ---- delegating accessors kept for existing callers ----
 
     public Long getId() {
         return user.getId();

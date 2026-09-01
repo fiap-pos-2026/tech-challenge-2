@@ -37,9 +37,6 @@ class StockServiceTest {
     @InjectMocks
     StockService sut;
 
-    // -------------------------------------------------------------------------
-    // debit
-    // -------------------------------------------------------------------------
     @Test
     void debit_reducesAvailableQuantityAndRecordsMovement() {
         UUID productUuid = UUID.randomUUID();
@@ -78,9 +75,6 @@ class StockServiceTest {
                 .isInstanceOf(ProductNotFoundException.class);
     }
 
-    // -------------------------------------------------------------------------
-    // credit
-    // -------------------------------------------------------------------------
     @Test
     void credit_increasesAvailableQuantityAndRecordsMovement() {
         UUID productUuid = UUID.randomUUID();
@@ -109,9 +103,6 @@ class StockServiceTest {
                 .isInstanceOf(ReturnNotAllowedException.class);
     }
 
-    // -------------------------------------------------------------------------
-    // compensate
-    // -------------------------------------------------------------------------
     @Test
     void compensate_increasesStockWithoutReturnabilityCheck() {
         UUID productUuid = UUID.randomUUID();
@@ -127,9 +118,6 @@ class StockServiceTest {
         assertThat(product.getAvailableQuantity()).isEqualByComparingTo("5.00");
     }
 
-    // -------------------------------------------------------------------------
-    // replenish
-    // -------------------------------------------------------------------------
     @Test
     void replenish_increasesStockAndRecordsMovement() {
         UUID productUuid = UUID.randomUUID();
@@ -145,9 +133,6 @@ class StockServiceTest {
         verify(stockMovementRepository).save(any());
     }
 
-    // -------------------------------------------------------------------------
-    // listMovements*
-    // -------------------------------------------------------------------------
     @Test
     void listMovementsByProduct_delegatesToRepository() {
         when(stockMovementRepository.findAllByProductId(eq(1L), any(org.springframework.data.domain.Pageable.class)))
@@ -193,9 +178,6 @@ class StockServiceTest {
                 m.getType() == br.com.fiap.pos.tech_challenge.core.domain.enums.MovementType.MANUAL_ADJUSTMENT));
     }
 
-    // -------------------------------------------------------------------------
-    // Helper
-    // -------------------------------------------------------------------------
     private Product productWithStock(UUID uuid, BigDecimal stock, BigDecimal unitPrice) {
         Product p = new Product();
         p.setUuid(uuid);

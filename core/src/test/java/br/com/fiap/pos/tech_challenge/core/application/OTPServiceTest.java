@@ -43,8 +43,6 @@ class OTPServiceTest {
 
     @InjectMocks OTPService sut;
 
-    // ---- generateAndSend ----
-
     @Test
     void generateAndSend_savesHashedToken() {
         ServiceOrder so = serviceOrder(ServiceOrderStatus.AWAITING_APPROVAL);
@@ -75,8 +73,6 @@ class OTPServiceTest {
         assertThat(existing.getInvalidatedAt()).isNotNull();
     }
 
-    // ---- validate — happy path ----
-
     @Test
     void validate_marksTokenUsedOnSuccess() throws Exception {
         UUID osUuid = UUID.randomUUID();
@@ -101,8 +97,6 @@ class OTPServiceTest {
         assertThat(token.isUsed()).isTrue();
         verify(otpTokenRepository, atLeastOnce()).save(token);
     }
-
-    // ---- validate — failures ----
 
     @Test
     void validate_throwsWhenServiceOrderNotFound() {
@@ -174,8 +168,6 @@ class OTPServiceTest {
         verify(notificationService).publishToRole(any(), any(), any(), eq(so));
     }
 
-    // ---- invalidateByServiceOrder ----
-
     @Test
     void invalidateByServiceOrder_setsInvalidatedAtWhenTokenExists() {
         ServiceOrder so = serviceOrder(ServiceOrderStatus.AWAITING_APPROVAL);
@@ -200,8 +192,6 @@ class OTPServiceTest {
 
         verify(otpTokenRepository, never()).save(any());
     }
-
-    // ---- sendEmail via generateAndSend ----
 
     @Test
     void generateAndSend_sendsEmailWithApprovalSubjectForNonCompletedStatus() {
@@ -253,8 +243,6 @@ class OTPServiceTest {
         verify(notificationService).publishToRole(any(), any(), any(), eq(so));
     }
 
-    // ---- validate — document mismatch ----
-
     @Test
     void validate_throwsWhenDocumentDoesNotMatch() throws Exception {
         UUID osUuid = UUID.randomUUID();
@@ -279,7 +267,6 @@ class OTPServiceTest {
         assertThat(token.getInvalidAttempts()).isEqualTo(1);
     }
 
-    // ---- helpers ----
     private ServiceOrder serviceOrder(ServiceOrderStatus status) {
         ServiceOrder so = new ServiceOrder();
         so.setStatus(status);

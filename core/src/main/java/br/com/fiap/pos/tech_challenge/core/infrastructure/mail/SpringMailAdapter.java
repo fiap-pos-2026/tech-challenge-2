@@ -10,11 +10,6 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Component;
 
-/**
- * Driven adapter for {@link MailPort}. Wraps Spring's {@link JavaMailSender} and translates
- * any delivery problem (including an unconfigured sender) into {@link MailDeliveryException},
- * so the application layer never sees a Spring mail type.
- */
 @Component
 @Log4j2
 public class SpringMailAdapter implements MailPort {

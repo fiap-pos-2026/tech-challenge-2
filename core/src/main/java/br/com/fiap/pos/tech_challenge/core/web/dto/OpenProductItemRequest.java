@@ -12,8 +12,6 @@ import java.util.UUID;
  */
 public record OpenProductItemRequest(
         @NotNull UUID productUuid,
-        // SPEC_DEVIATION: design.md especifica Integer quantity
-        // Reason: QuoteProductLine.quantity e AddProductRequest usam BigDecimal (produtos têm unidade de medida fracionária)
         @NotNull @DecimalMin("0.001") BigDecimal quantity
 ) {
 }

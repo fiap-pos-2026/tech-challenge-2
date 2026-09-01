@@ -1,9 +1,5 @@
 package br.com.fiap.pos.tech_challenge.core.domain.exception;
 
-/**
- * Semantic error status, free of any web framework type. The web layer maps the
- * {@link #code()} onto its own HTTP status representation.
- */
 public enum ErrorStatus {
     BAD_REQUEST(400),
     UNAUTHORIZED(401),

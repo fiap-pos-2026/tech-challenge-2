@@ -105,8 +105,6 @@ public class ServiceOrderService {
         return buildResponse(persistStatusChange(so, ServiceOrderStatus.IN_DIAGNOSIS));
     }
 
-    // -----------------------------------------------------------------------
-    // -----------------------------------------------------------------------
     @Transactional
     public ServiceOrderResponse addServiceToDiagnosis(UUID osUuid, UUID mechanicalServiceUuid) {
         ServiceOrder so = findServiceOrder(osUuid);
@@ -123,8 +121,6 @@ public class ServiceOrderService {
         return buildResponse(so);
     }
 
-    // -----------------------------------------------------------------------
-    // -----------------------------------------------------------------------
     @Transactional
     public ServiceOrderResponse removeServiceFromDiagnosis(UUID osUuid, UUID mechanicalServiceUuid) {
         ServiceOrder so = findServiceOrder(osUuid);
@@ -143,8 +139,6 @@ public class ServiceOrderService {
         return buildResponse(so);
     }
 
-    // -----------------------------------------------------------------------
-    // -----------------------------------------------------------------------
     @Transactional
     public ServiceOrderResponse addProductToDiagnosis(UUID osUuid, UUID productUuid, BigDecimal quantity) {
         ServiceOrder so = findServiceOrder(osUuid);
@@ -169,8 +163,6 @@ public class ServiceOrderService {
         return buildResponse(so);
     }
 
-    // -----------------------------------------------------------------------
-    // -----------------------------------------------------------------------
     @Transactional
     public ServiceOrderResponse removeProductFromDiagnosis(UUID osUuid, UUID productUuid) {
         ServiceOrder so = findServiceOrder(osUuid);
@@ -189,8 +181,6 @@ public class ServiceOrderService {
         return buildResponse(so);
     }
 
-    // -----------------------------------------------------------------------
-    // -----------------------------------------------------------------------
     @Transactional
     public ServiceOrderResponse completeDiagnosis(UUID osUuid) {
         ServiceOrder so = findServiceOrder(osUuid);
@@ -207,8 +197,6 @@ public class ServiceOrderService {
         return buildResponse(saved);
     }
 
-    // -----------------------------------------------------------------------
-    // -----------------------------------------------------------------------
     @Transactional
     public ServiceOrderResponse approveQuote(UUID osUuid, String customerDocument, String tokenRaw) {
         otpService.validate(osUuid, customerDocument, tokenRaw);
@@ -250,8 +238,6 @@ public class ServiceOrderService {
         return buildResponse(saved);
     }
 
-    // -----------------------------------------------------------------------
-    // -----------------------------------------------------------------------
     @Transactional
     public ServiceOrderResponse rejectQuote(UUID osUuid, String customerDocument, String tokenRaw,
                                              UserDetailsImpl principal) {
@@ -287,8 +273,6 @@ public class ServiceOrderService {
         return buildResponse(saved);
     }
 
-    // -----------------------------------------------------------------------
-    // -----------------------------------------------------------------------
     @Transactional
     public void resendOTP(UUID osUuid) {
         ServiceOrder so = findServiceOrder(osUuid);
@@ -300,8 +284,6 @@ public class ServiceOrderService {
         otpService.generateAndSend(so);
     }
 
-    // -----------------------------------------------------------------------
-    // -----------------------------------------------------------------------
     @Transactional
     public ServiceOrderResponse requestProduct(UUID osUuid, UUID productUuid,
                                                 BigDecimal quantity, UserDetailsImpl principal) {
@@ -349,8 +331,6 @@ public class ServiceOrderService {
         return buildResponse(so);
     }
 
-    // -----------------------------------------------------------------------
-    // -----------------------------------------------------------------------
     @Transactional
     public ServiceOrderResponse returnProduct(UUID osUuid, UUID productUuid,
                                                String rawPassword, UserDetailsImpl principal) {
@@ -378,8 +358,6 @@ public class ServiceOrderService {
         return buildResponse(so);
     }
 
-    // -----------------------------------------------------------------------
-    // -----------------------------------------------------------------------
     @Transactional
     public ServiceOrderResponse completeExecution(UUID osUuid) {
         ServiceOrder so = findServiceOrder(osUuid);
@@ -391,8 +369,6 @@ public class ServiceOrderService {
         return buildResponse(saved);
     }
 
-    // -----------------------------------------------------------------------
-    // -----------------------------------------------------------------------
     @Transactional
     public ServiceOrderResponse acceptDelivery(UUID osUuid, String customerDocument,
                                                 String tokenRaw, boolean byAttendantJwt) {
@@ -406,8 +382,6 @@ public class ServiceOrderService {
         return buildResponse(persistStatusChange(so, ServiceOrderStatus.DELIVERED));
     }
 
-    // -----------------------------------------------------------------------
-    // -----------------------------------------------------------------------
     @Transactional
     public ServiceOrderResponse rejectDelivery(UUID osUuid, String customerDocument,
                                                 String tokenRaw, String reason) {
@@ -439,8 +413,6 @@ public class ServiceOrderService {
         return buildResponse(saved);
     }
 
-    // -----------------------------------------------------------------------
-    // -----------------------------------------------------------------------
     @Transactional
     public ServiceOrderResponse closeDispute(UUID osUuid, String resolution, UserDetailsImpl principal) {
         ServiceOrder so = findServiceOrder(osUuid);
@@ -462,8 +434,6 @@ public class ServiceOrderService {
         return buildResponse(saved);
     }
 
-    // -----------------------------------------------------------------------
-    // -----------------------------------------------------------------------
     @Transactional(readOnly = true)
     public ServiceOrderStatusResponse getServiceOrderStatus(UUID osUuid) {
         ServiceOrder so = findServiceOrder(osUuid);
@@ -484,9 +454,6 @@ public class ServiceOrderService {
                 .map(this::buildResponse);
     }
 
-    // -----------------------------------------------------------------------
-    // Private helpers
-    // -----------------------------------------------------------------------
     // A ordem de prioridade da listagem é definida na query; o sort enviado pelo client é descartado
     // para não sobrescrevê-la.
     private Pageable withoutClientSort(Pageable pageable) {

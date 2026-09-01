@@ -258,7 +258,6 @@ class ServiceOrderIntegrationTest extends BaseIntegrationTest {
         serviceOrderService.startDiagnosis(created.uuid());
         serviceOrderService.completeDiagnosis(created.uuid()); // → AWAITING_APPROVAL
 
-        // advance to IN_PROGRESS directly (simulates quote approval)
         ServiceOrder persisted = serviceOrderRepository.findByUuid(created.uuid()).orElseThrow();
         persisted.setStatus(ServiceOrderStatus.IN_PROGRESS);
         serviceOrderRepository.save(persisted);

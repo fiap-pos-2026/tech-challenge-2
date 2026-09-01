@@ -46,8 +46,6 @@ class AuthenticationServiceTest {
 
     @InjectMocks AuthenticationService sut;
 
-    // ---- authenticate ----
-
     @Test
     void authenticate_returnsTokenOnSuccess() throws Exception {
         User user = activeUser("operador");
@@ -174,8 +172,6 @@ class AuthenticationServiceTest {
         verify(userService).saveLoginState(user);
     }
 
-    // ---- signout ----
-
     @Test
     void signout_invalidatesTokenInBlacklist() {
         String rawToken = "Bearer abc.def.ghi";
@@ -203,8 +199,6 @@ class AuthenticationServiceTest {
 
         verify(auditLogService).register(any(), any(), eq("jti-456"), eq("204"), isNull());
     }
-
-    // ---- validatePassword ----
 
     @Test
     void validatePassword_succeedsWhenPasswordMatches() {
@@ -242,8 +236,6 @@ class AuthenticationServiceTest {
         assertThatThrownBy(() -> sut.validatePassword("ghost", "qualquer"))
                 .isInstanceOf(CoreException.class);
     }
-
-    // ---- helpers ----
 
     private User activeUser(String login) {
         User u = new User();

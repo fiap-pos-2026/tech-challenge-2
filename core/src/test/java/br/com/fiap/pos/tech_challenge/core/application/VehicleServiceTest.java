@@ -38,8 +38,6 @@ class VehicleServiceTest {
 
     @InjectMocks VehicleService sut;
 
-    // ---- register ----
-
     @Test
     void register_savesAndReturnsResponse() {
         UUID customerUuid = UUID.randomUUID();
@@ -69,8 +67,6 @@ class VehicleServiceTest {
         verify(repository, never()).save(any());
     }
 
-    // ---- findByUuid ----
-
     @Test
     void findByUuid_returnsResponseWhenFound() {
         UUID uuid = UUID.randomUUID();
@@ -92,8 +88,6 @@ class VehicleServiceTest {
                 .isInstanceOf(VehicleNotFoundException.class);
     }
 
-    // ---- findByLicensePlate ----
-
     @Test
     void findByLicensePlate_returnsResponse() {
         Vehicle entity = new Vehicle();
@@ -112,8 +106,6 @@ class VehicleServiceTest {
                 .isInstanceOf(VehicleNotFoundException.class);
     }
 
-    // ---- validateExistence ----
-
     @Test
     void validateExistence_throwsWhenNotFound() {
         when(repository.existsById(99L)).thenReturn(false);
@@ -128,8 +120,6 @@ class VehicleServiceTest {
 
         sut.validateExistence(1L); // no exception expected
     }
-
-    // ---- update ----
 
     @Test
     void update_appliesChangesAndReturns() {
@@ -154,8 +144,6 @@ class VehicleServiceTest {
         assertThatThrownBy(() -> sut.update(uuid, new UpdateVehicleRequest("x", "y", 2020)))
                 .isInstanceOf(VehicleNotFoundException.class);
     }
-
-    // ---- delete ----
 
     @Test
     void delete_removesWhenNoActiveOrders() {
@@ -184,8 +172,6 @@ class VehicleServiceTest {
                 .isInstanceOf(CoreException.class);
     }
 
-    // ---- findEntityByUuid ----
-
     @Test
     void findEntityByUuid_returnsEntity() {
         UUID uuid = UUID.randomUUID();
@@ -195,7 +181,6 @@ class VehicleServiceTest {
         assertThat(sut.findEntityByUuid(uuid)).isSameAs(entity);
     }
 
-    // ---- helper ----
     private VehicleResponse vehicleResponse() {
         return new VehicleResponse(UUID.randomUUID(), "ABC1234", "Toyota", "Corolla", 2022, UUID.randomUUID());
     }

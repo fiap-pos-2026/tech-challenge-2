@@ -9,10 +9,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-/**
- * Driven adapter: on every committed service-order status change, e-mails the customer.
- * Runs {@code AFTER_COMMIT} so an SMTP failure never rolls back the persisted transition.
- */
 @Component
 @RequiredArgsConstructor
 @Log4j2
