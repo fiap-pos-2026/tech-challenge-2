@@ -1,15 +1,16 @@
 package br.com.fiap.pos.tech_challenge.core.integration;
 
-import br.com.fiap.pos.tech_challenge.core.domain.Customer;
-import br.com.fiap.pos.tech_challenge.core.domain.ServiceOrder;
-import br.com.fiap.pos.tech_challenge.core.domain.Vehicle;
-import br.com.fiap.pos.tech_challenge.core.enums.DocumentType;
-import br.com.fiap.pos.tech_challenge.core.enums.ServiceOrderStatus;
-import br.com.fiap.pos.tech_challenge.core.repository.CustomerRepository;
-import br.com.fiap.pos.tech_challenge.core.repository.ServiceOrderRepository;
-import br.com.fiap.pos.tech_challenge.core.repository.VehicleRepository;
-import br.com.fiap.pos.tech_challenge.core.service.OTPService;
-import br.com.fiap.pos.tech_challenge.core.service.ServiceOrderService;
+import br.com.fiap.pos.tech_challenge.core.domain.model.Customer;
+import br.com.fiap.pos.tech_challenge.core.domain.model.ServiceOrder;
+import br.com.fiap.pos.tech_challenge.core.domain.model.Vehicle;
+import br.com.fiap.pos.tech_challenge.core.domain.enums.DocumentType;
+import br.com.fiap.pos.tech_challenge.core.domain.enums.ServiceOrderStatus;
+import br.com.fiap.pos.tech_challenge.core.application.port.out.CustomerRepository;
+import br.com.fiap.pos.tech_challenge.core.application.port.out.ServiceOrderRepository;
+import br.com.fiap.pos.tech_challenge.core.application.port.out.VehicleRepository;
+import br.com.fiap.pos.tech_challenge.core.application.OTPService;
+import br.com.fiap.pos.tech_challenge.core.application.serviceorder.ServiceOrderDiagnosisService;
+import br.com.fiap.pos.tech_challenge.core.application.serviceorder.ServiceOrderOpeningService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,7 +38,8 @@ import static org.mockito.Mockito.verify;
  */
 class StatusEmailNotifierIntegrationTest extends BaseIntegrationTest {
 
-    @Autowired ServiceOrderService serviceOrderService;
+    @Autowired ServiceOrderOpeningService openingService;
+    @Autowired ServiceOrderDiagnosisService diagnosisService;
     @Autowired ServiceOrderRepository serviceOrderRepository;
     @Autowired CustomerRepository customerRepository;
     @Autowired VehicleRepository vehicleRepository;
@@ -78,10 +80,10 @@ class StatusEmailNotifierIntegrationTest extends BaseIntegrationTest {
         doThrow(new MailSendException("SMTP indisponível"))
                 .when(mailSender).send(any(SimpleMailMessage.class));
 
-        var created = serviceOrderService.openServiceOrder(
+        var created = openingService.openServiceOrder(
                 customer.getUuid(), vehicle.getUuid(), "SMTP fora do ar");
 
-        assertThatCode(() -> serviceOrderService.startDiagnosis(created.uuid()))
+        assertThatCode(() -> diagnosisService.startDiagnosis(created.uuid()))
                 .doesNotThrowAnyException();
 
         ServiceOrder persisted = serviceOrderRepository.findByUuid(created.uuid()).orElseThrow();

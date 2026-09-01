@@ -3,9 +3,9 @@
 > **Tech Challenge — Fase 1 e Fase 2 | Pós Tech FIAP 15SOAT**
 
 Back-end do sistema integrado de atendimento para oficina mecânica, com foco em gestão de ordens de
-serviço, clientes e peças, aplicando **Domain-Driven Design (DDD)** sobre uma **Clean Architecture**,
-com qualidade de software, segurança e, na Fase 2, orquestração em Kubernetes, infraestrutura como
-código e pipeline de CI/CD.
+serviço, clientes e peças, aplicando **Domain-Driven Design (DDD)** sobre uma **Arquitetura
+Hexagonal (Ports & Adapters)**, com qualidade de software, segurança e, na Fase 2, orquestração em
+Kubernetes, infraestrutura como código e pipeline de CI/CD.
 
 ---
 
@@ -23,9 +23,11 @@ O sistema resolve esses problemas permitindo:
 
 ### Objetivos da Fase 2
 
-A Fase 2 evolui o back-end da Fase 1 para atender qualidade, resiliência e escalabilidade sem trocar
-o modelo arquitetural:
+A Fase 2 evolui o back-end da Fase 1 para atender qualidade, resiliência e escalabilidade:
 
+- **Migração para Arquitetura Hexagonal (Ports & Adapters)**: domínio livre de framework
+  (POJOs sem JPA/Hibernate/Bean Validation), persistência e I/O atrás de _ports_ com _adapters_
+  em `infrastructure/`
 - Abertura de OS com serviços e peças opcionais já no ato do cadastro
 - Listagem priorizada de OS (ordem de negócio + exclusão de Finalizada/Entregue por padrão)
 - Notificação do cliente por e-mail a cada mudança de status da OS
@@ -102,30 +104,107 @@ registrada em log e **não** reverte a transição já persistida.
 | Migrations | Liquibase |
 | Segurança | Spring Security + JWT RSA (OAuth2 Resource Server) |
 | Documentação | Springdoc OpenAPI 3 (Swagger UI) |
+| Mapeamento | MapStruct (DTO ↔ domínio, domínio ↔ entidade JPA) |
 | Testes de integração | Testcontainers |
-| Cobertura | JaCoCo (gate ≥ 80% nos domínios críticos) |
+| Cobertura | JaCoCo (gate ≥ 80% LINE em `application`, `validation` e `infrastructure.persistence.adapter`) |
+| Trava de arquitetura | ArchUnit (`HexagonalArchitectureTest` no `:core:test`) |
 | Orquestração (Fase 2) | Kubernetes (microk8s) via Kustomize |
 | IaC (Fase 2) | Terraform |
 | CI/CD (Fase 2) | GitHub Actions (runners GitHub-hosted e self-hosted) |
 
-### Arquitetura
+### Arquitetura — Hexagonal (Ports & Adapters)
 
-Back-end monolítico em **Clean Architecture** — camadas concêntricas onde regras de negócio não
-dependem de frameworks web ou de persistência:
+Back-end monolítico em **Arquitetura Hexagonal**, aplicando a **Regra de Dependência** da Clean
+Architecture: as setas apontam sempre para dentro (`web` e `infrastructure` dependem de
+`application`, que depende de `domain`; `domain` não depende de ninguém). Na Fase 2 o código da
+Fase 1 (em camadas Spring, com o domínio sendo as próprias entidades JPA) foi migrado para este
+layout.
 
 ```
-controller/   →  Interface adapters: @RestController + DTOs de request/response
-service/      →  Casos de uso / regras de aplicação (@Service)
-domain/       →  Entidades de domínio + enums (núcleo, sem dependência de framework)
-repository/   →  Interfaces Spring Data JPA (porta de saída para persistência)
-security/     →  Filtros JWT, autenticação, autorização por role (infraestrutura)
-validation/   →  @ValidTaxId (CPF/CNPJ), @ValidLicensePlate
-scheduler/    →  Expiração automática de orçamentos (7 dias)
+domain/
+  model/          →  Núcleo: entidades e regras invariantes como POJOs — sem jakarta.persistence,
+                     sem Hibernate, sem Bean Validation. equals/hashCode por identidade de negócio
+  enums/          →  Enums de domínio + EApplicationError (com ErrorStatus próprio, sem HttpStatus)
+  exception/      →  Exceções de negócio (sem org.springframework.*)
+
+application/       →  Camada interna: serviços de aplicação (casos de uso, @Service, @Transactional)
+  serviceorder/   →  Caso de uso ServiceOrder decomposto por fase: ServiceOrderOpeningService,
+                     ServiceOrderDiagnosisService, QuoteApprovalService, ServiceOrderExecutionService,
+                     ServiceOrderDeliveryService, ServiceOrderDisputeService, ServiceOrderQueryService,
+                     sobre 3 colaboradores package-private (ServiceOrderStore, QuoteWorkbench,
+                     ServiceOrderResponseFactory)
+  dto/            →  DTOs de request/response (records) — o contrato de borda pertence ao núcleo
+  mapper/         →  MapStruct DTO ↔ domínio
+  port/out/       →  Portas de saída (interfaces): *Repository, MailPort, PasswordHasher,
+                     DomainEventPublisher, TokenBlacklistPort, CurrentActorPort
+  event/          →  ServiceOrderStatusChangedEvent (record neutro)
+  scheduler/      →  Expiração automática de orçamentos (7 dias)
+
+infrastructure/   →  Adapters de saída (frameworks & drivers)
+  persistence/
+    entity/       →  Entidades JPA (*Entity) — todo o mapeamento @Entity/@Column/@ManyToOne/@Version
+    jpa/          →  Interfaces Spring Data (*JpaRepository)
+    adapter/      →  *RepositoryAdapter implements application.port.out.*Repository
+    mapper/       →  PersistenceMapper (MapStruct) domínio ↔ *Entity, com tratamento de ciclo
+                     no agregado Quote
+  security/       →  SecurityConfig, filtros JWT, TokenUtility, TokenMapper, UserDetailsImpl (compõe
+                     o domain.model.User, não estende), SpringUserDetailsService (UserDetailsService
+                     do Spring, isolado da camada de aplicação), BCryptPasswordHasher,
+                     RedisTokenBlacklistService, AdminCredentialInitializer,
+                     SecurityContextCurrentActorAdapter
+  mail/           →  SpringMailAdapter implements MailPort (envolve JavaMailSender)
+  event/          →  SpringDomainEventPublisher; StatusEmailNotifier (@TransactionalEventListener)
+  config/         →  MessageSource, OpenAPI, PasswordEncoder
+
+web/              →  Adapters de entrada
+  controller/     →  @RestController (só tradução HTTP; delega para os casos de uso)
+  dto/            →  PageResponseDTO (envelope de paginação exclusivo da borda web)
+  exception/      →  @ControllerAdvice (traduz ErrorStatus → HTTP)
+
+util/  validation/ →  Helpers de borda (Translator, WebUtility, AuthUtility) e validadores
+                      (@ValidTaxId CPF/CNPJ, @ValidLicensePlate)
 ```
 
-A Fase 2 manteve deliberadamente a Clean Architecture já adotada na Fase 1 — **não houve migração
-para Hexagonal/ports-and-adapters**; os gaps de API e a fatia de plataforma (Kustomize, Terraform,
-CI/CD) foram entregues sobre o layout existente.
+A **Regra de Dependência é verificada por teste**: `HexagonalArchitectureTest` (ArchUnit) roda
+dentro de `:core:test` e falha o build se `domain` ou `application` (incluindo `application.port`)
+passarem a depender de `web` ou `infrastructure`, ou se o `domain` ganhar dependência de
+Spring/JPA/MapStruct/Jackson. Exceção única e documentada: `AuthenticationService`, que ainda
+importa `infrastructure.security` (Spring Security) — dívida técnica registrada para extração
+futura em portas de autenticação/token.
+
+```mermaid
+flowchart LR
+  subgraph in["Adapters de entrada (web)"]
+    C[Controllers]
+  end
+  subgraph app["application (camada interna)"]
+    UC["Serviços de aplicação (casos de uso)"]
+    DTO["dto + mapper (contrato de borda)"]
+    P["port/out (interfaces)"]
+  end
+  subgraph dom["domain"]
+    M["model (POJOs) · enums · exception"]
+  end
+  subgraph out["Adapters de saída (infrastructure)"]
+    DB["persistence: JPA + adapters + MapStruct"]
+    MAIL["mail: SpringMailAdapter"]
+    EVT["event: Spring publisher + listener"]
+    SEC["security: JWT · BCrypt · Redis"]
+  end
+  C --> UC
+  UC --> M
+  UC --> P
+  DB -. implements .-> P
+  MAIL -. implements .-> P
+  EVT -. implements .-> P
+  SEC -. implements .-> P
+  DB --> M
+```
+
+**Gate de cobertura (JaCoCo ≥ 80% LINE)** mede os pacotes `application.*` (casos de uso),
+`validation.*` e `infrastructure.persistence.adapter` (os adapters JPA, cobertos pelos testes de
+integração). Ficam de fora da métrica: `application.dto`, `application.mapper` (glue MapStruct),
+controllers, `config`, `exception`, `enums` e `domain`.
 
 ### Arquitetura da infraestrutura
 
@@ -212,17 +291,18 @@ Secret `ghcr-pull` (`imagePullSecrets` em `k8s/base/deployment.yaml`), provision
 quando `ghcr_pull_token` é informado:
 
 ```bash
-# 1. Verifique o cluster e habilite os addons necessários
-microk8s status --wait-ready
-microk8s enable dns hostpath-storage metrics-server
-microk8s kubectl get nodes
+# 1. Bootstrap do cluster (instala o microk8s se ausente, sobe, habilita os addons,
+#    escreve o kubeconfig). Rode `sudo -v` antes se o sudo pedir senha.
+cd infra/cluster
+terraform init -backend-config="path=$HOME/.local/state/tech-challenge/cluster.tfstate"
+terraform apply
+cd ..
 
 # 2. Provisione namespace, PostgreSQL, Redis e Mailpit
-cd infra
 cp terraform.tfvars.example terraform.tfvars
 # Edite terraform.tfvars: informe db_password e, para puxar a imagem privada do GHCR,
 # ghcr_pull_token (PAT com escopo read:packages)
-terraform init
+terraform init -backend-config="path=$HOME/.local/state/tech-challenge/terraform.tfstate"
 terraform plan -var-file=terraform.tfvars
 terraform apply -var-file=terraform.tfvars
 cd ..
@@ -267,18 +347,22 @@ Acesse `http://localhost:8025`.
 
 ### Terraform (infraestrutura de apoio)
 
-O diretório `/infra` provisiona, via Terraform, o namespace, PostgreSQL, Redis e
-Mailpit **sobre um microk8s já instalado**. O Terraform não instala o cluster:
+O diretório `/infra` tem dois configs Terraform: `infra/cluster/` faz o bootstrap do microk8s
+(instala se ausente, sobe, habilita addons, escreve o kubeconfig) e `infra/` provisiona
+namespace, PostgreSQL, Redis e Mailpit. Rodam nessa ordem — o config de recursos usa o provider
+`kubernetes`, que precisa de um cluster no ar:
 
 ```bash
-cd infra
-terraform init
+cd infra/cluster
+terraform init -backend-config="path=$HOME/.local/state/tech-challenge/cluster.tfstate"
+terraform apply
+cd ..
+terraform init -backend-config="path=$HOME/.local/state/tech-challenge/terraform.tfstate"
 cp terraform.tfvars.example terraform.tfvars   # defina db_password real
-terraform plan -var-file=terraform.tfvars
 terraform apply -var-file=terraform.tfvars
 ```
 
-Passo a passo completo, variáveis, Secret da aplicação e outputs estão em
+Motivo do split, variáveis, Secret da aplicação e outputs estão em
 [`infra/README.md`](infra/README.md).
 
 ### CI/CD
@@ -429,78 +513,102 @@ Após o primeiro login, o sistema bloqueia todas as operações e exige a troca 
 
 ## Endpoints da API
 
-### Autenticação
+Context path: todos os caminhos são servidos sob `/core` (ex.: `POST /core/api/signin`).
+`ADMIN` acumula as permissões de `ATTENDANT`.
+
+### Autenticação e Perfil
 
 | Método | Caminho | Auth | Descrição |
 |---|---|---|---|
-| `POST` | `/api/auth/login` | Público | Autenticação (retorna JWT) |
-| `PUT` | `/api/profile/password` | JWT | Troca de senha obrigatória no primeiro login |
+| `POST` | `/api/signin` | Público | Autenticação — retorna JWT (RS256) |
+| `POST` | `/api/signout` | JWT | Logout — invalida o token na blacklist (Redis) |
+| `GET` | `/api/profile` | JWT | Dados do usuário autenticado |
+| `PUT` | `/api/profile/password` | JWT | Troca de senha (obrigatória no primeiro login) |
+
+### Usuários internos
+
+| Método | Caminho | Papel | Descrição |
+|---|---|---|---|
+| `POST` | `/api/users` | ADMIN | Cadastrar Atendente ou Mecânico |
+| `GET` | `/api/users` | ADMIN | Listar usuários |
+| `GET` | `/api/users/{uuid}` | ADMIN | Buscar por ID |
+| `PUT` | `/api/users/{uuid}` | ADMIN | Atualizar usuário |
+| `DELETE` | `/api/users/{uuid}` | ADMIN | Remover usuário |
 
 ### Clientes
 
 | Método | Caminho | Papel | Descrição |
 |---|---|---|---|
-| `POST` | `/api/customers` | ATTENDANT | Cadastrar cliente (CPF ou CNPJ) |
-| `GET` | `/api/customers` | ATTENDANT, MECHANIC | Listar clientes |
-| `GET` | `/api/customers/{uuid}` | ATTENDANT, MECHANIC | Buscar por ID |
-| `GET` | `/api/customers/document/{taxId}` | ATTENDANT, MECHANIC | Buscar por CPF/CNPJ |
-| `PUT` | `/api/customers/{uuid}` | ATTENDANT | Atualizar cliente |
-| `DELETE` | `/api/customers/{uuid}` | ATTENDANT | Remover cliente |
+| `POST` | `/api/customers` | ADMIN, ATTENDANT | Cadastrar cliente (CPF ou CNPJ) |
+| `GET` | `/api/customers?document={cpfCnpj}` | ADMIN, ATTENDANT | Buscar por CPF/CNPJ (query param) |
+| `GET` | `/api/customers/{uuid}` | ADMIN, ATTENDANT | Buscar por ID (documento mascarado) |
+| `GET` | `/api/customers/{uuid}/document` | ADMIN, ATTENDANT | Documento completo, sem máscara |
+| `PUT` | `/api/customers/{uuid}` | ADMIN, ATTENDANT | Atualizar cliente |
+| `DELETE` | `/api/customers/{uuid}` | ADMIN, ATTENDANT | Remover cliente (409 se houver OS ativa) |
 
 ### Veículos
 
 | Método | Caminho | Papel | Descrição |
 |---|---|---|---|
-| `POST` | `/api/vehicles` | ATTENDANT | Cadastrar veículo |
-| `GET` | `/api/vehicles` | ATTENDANT, MECHANIC | Listar veículos |
-| `GET` | `/api/vehicles/{uuid}` | ATTENDANT, MECHANIC | Buscar por ID |
-| `GET` | `/api/vehicles/license-plate/{plate}` | ATTENDANT, MECHANIC | Buscar por placa |
-| `PUT` | `/api/vehicles/{uuid}` | ATTENDANT | Atualizar veículo |
-| `DELETE` | `/api/vehicles/{uuid}` | ATTENDANT | Remover veículo |
+| `POST` | `/api/vehicles` | ADMIN, ATTENDANT | Cadastrar veículo |
+| `GET` | `/api/vehicles?licensePlate={placa}` | ADMIN, ATTENDANT, MECHANIC | Buscar por placa (query param) |
+| `GET` | `/api/vehicles/{uuid}` | ADMIN, ATTENDANT, MECHANIC | Buscar por ID |
+| `PUT` | `/api/vehicles/{uuid}` | ADMIN, ATTENDANT | Atualizar veículo |
+| `DELETE` | `/api/vehicles/{uuid}` | ADMIN, ATTENDANT | Remover veículo (409 se houver OS ativa) |
 
 ### Catálogo de Serviços
 
 | Método | Caminho | Papel | Descrição |
 |---|---|---|---|
-| `POST` | `/api/catalog/services` | ATTENDANT | Cadastrar serviço |
-| `GET` | `/api/catalog/services` | ATTENDANT, MECHANIC | Listar serviços |
-| `GET` | `/api/catalog/services/{uuid}` | ATTENDANT, MECHANIC | Buscar por ID |
-| `PUT` | `/api/catalog/services/{uuid}` | ATTENDANT | Atualizar serviço |
-| `DELETE` | `/api/catalog/services/{uuid}` | ATTENDANT | Remover serviço |
-| `GET` | `/api/catalog/services/avg-duration` | ATTENDANT, MECHANIC | Tempo médio de execução por serviço |
+| `POST` | `/api/catalog/services` | ADMIN, ATTENDANT | Cadastrar serviço |
+| `GET` | `/api/catalog/services` | ADMIN, ATTENDANT, MECHANIC | Listar (paginado) |
+| `GET` | `/api/catalog/services/{uuid}` | ADMIN, ATTENDANT, MECHANIC | Buscar por ID |
+| `PUT` | `/api/catalog/services/{uuid}` | ADMIN, ATTENDANT | Atualizar serviço |
+| `GET` | `/api/catalog/services/avg-duration` | ADMIN, ATTENDANT, MECHANIC | Tempo médio de execução por serviço |
+| `DELETE` | `/api/catalog/services/{uuid}` | ADMIN, ATTENDANT | Remover serviço (409 se vinculado a OS ativa) |
 
-### Produtos e Estoque
+### Inventário (produtos e estoque)
 
 | Método | Caminho | Papel | Descrição |
 |---|---|---|---|
-| `POST` | `/api/catalog/products` | ATTENDANT | Cadastrar produto/insumo |
-| `GET` | `/api/catalog/products` | ATTENDANT, MECHANIC | Listar produtos |
-| `GET` | `/api/catalog/products/{uuid}` | ATTENDANT, MECHANIC | Buscar por ID |
-| `PUT` | `/api/catalog/products/{uuid}` | ATTENDANT | Atualizar produto |
-| `DELETE` | `/api/catalog/products/{uuid}` | ATTENDANT | Remover produto |
-| `POST` | `/api/catalog/products/{uuid}/stock` | ATTENDANT | Ajuste manual de estoque |
+| `POST` | `/api/inventory/products` | ADMIN, ATTENDANT | Cadastrar produto/insumo (`type`: `PART`/`SUPPLY`) |
+| `GET` | `/api/inventory/products` | ADMIN, ATTENDANT, MECHANIC | Listar (paginado) |
+| `GET` | `/api/inventory/products/{uuid}` | ADMIN, ATTENDANT, MECHANIC | Buscar por ID |
+| `PUT` | `/api/inventory/products/{uuid}` | ADMIN, ATTENDANT | Atualizar produto |
+| `DELETE` | `/api/inventory/products/{uuid}` | ADMIN, ATTENDANT | Remover produto |
+| `POST` | `/api/inventory/products/{uuid}/replenishment` | ADMIN, ATTENDANT | Repor estoque (incrementa saldo + movimento `REPLENISHMENT`) |
+| `POST` | `/api/inventory/manual-adjustment` | ADMIN, ATTENDANT | Ajuste manual (só auditoria — não altera saldo) |
+| `GET` | `/api/inventory/movements` | ADMIN, ATTENDANT | Listar movimentações (filtro opcional `productId`) |
 
 ### Ordens de Serviço
 
 | Método | Caminho | Papel | Descrição |
 |---|---|---|---|
-| `POST` | `/api/service-orders` | ATTENDANT | Abrir OS com queixa do cliente e, opcionalmente, serviços/peças já na abertura (orçamento provisório) |
-| `GET` | `/api/service-orders` | ATTENDANT, MECHANIC | Listar OSs priorizadas (`IN_PROGRESS` > `AWAITING_APPROVAL` > `IN_DIAGNOSIS` > `RECEIVED`, depois `createdAt` ASC); exclui `COMPLETED`/`DELIVERED` por padrão; filtros: `status`, `customerUuid`, `from`, `to` |
-| `GET` | `/api/service-orders/{uuid}` | ATTENDANT, MECHANIC | Detalhar OS |
-| `GET` | `/api/service-orders/{uuid}/status` | **Público** | Consultar status da OS (cliente) |
-| `POST` | `/api/service-orders/{uuid}/diagnosis/start` | MECHANIC | Iniciar diagnóstico |
-| `POST` | `/api/service-orders/{uuid}/diagnosis/services` | MECHANIC | Adicionar serviço ao diagnóstico |
-| `DELETE` | `/api/service-orders/{uuid}/diagnosis/services/{itemId}` | MECHANIC | Remover serviço do diagnóstico |
-| `POST` | `/api/service-orders/{uuid}/diagnosis/products` | MECHANIC | Adicionar produto ao diagnóstico |
-| `POST` | `/api/service-orders/{uuid}/diagnosis/complete` | MECHANIC | Concluir diagnóstico (gera orçamento + envia OTP) |
-| `POST` | `/api/service-orders/{uuid}/approval` | **Público (OTP)** | Aprovar ou rejeitar orçamento |
-| `POST` | `/api/service-orders/{uuid}/otp/resend` | ATTENDANT | Reenviar OTP de aprovação |
-| `POST` | `/api/service-orders/{uuid}/execution/products` | MECHANIC | Solicitar produto na execução (débito imediato) |
-| `DELETE` | `/api/service-orders/{uuid}/execution/products/{productUuid}` | ATTENDANT | Devolver produto ao estoque |
-| `POST` | `/api/service-orders/{uuid}/execution/complete` | MECHANIC | Concluir execução |
-| `POST` | `/api/service-orders/{uuid}/delivery/accept` | ATTENDANT (JWT) ou **Público (OTP)** | Aceitar vistoria de entrega |
-| `POST` | `/api/service-orders/{uuid}/delivery/reject` | **Público (OTP)** | Rejeitar vistoria de entrega |
-| `POST` | `/api/service-orders/{uuid}/close-dispute` | ATTENDANT | Encerrar OS como DISPUTED |
+| `POST` | `/api/service-orders` | ADMIN, ATTENDANT | Abrir OS com a queixa do cliente e, opcionalmente, serviços/peças já na abertura (orçamento provisório) |
+| `GET` | `/api/service-orders` | ADMIN, ATTENDANT, MECHANIC | Listar priorizado (`IN_PROGRESS` > `AWAITING_APPROVAL` > `IN_DIAGNOSIS` > `RECEIVED`, depois `createdAt` ASC); exclui `COMPLETED`/`DELIVERED` por padrão; filtros: `status`, `customerUuid`, `from`, `to` |
+| `GET` | `/api/service-orders/{uuid}` | ADMIN, ATTENDANT, MECHANIC | Detalhar OS (com orçamento) |
+| `GET` | `/api/service-orders/{uuid}/status` | **Público** | Consultar status (cliente) |
+| `POST` | `/api/service-orders/{uuid}/diagnosis/start` | ADMIN, MECHANIC | Iniciar diagnóstico |
+| `POST` | `/api/service-orders/{uuid}/diagnosis/services` | ADMIN, MECHANIC | Adicionar serviço ao diagnóstico |
+| `DELETE` | `/api/service-orders/{uuid}/diagnosis/services/{mechanicalServiceUuid}` | ADMIN, MECHANIC | Remover serviço do diagnóstico |
+| `POST` | `/api/service-orders/{uuid}/diagnosis/products` | ADMIN, MECHANIC | Adicionar produto ao diagnóstico |
+| `DELETE` | `/api/service-orders/{uuid}/diagnosis/products/{productUuid}` | ADMIN, MECHANIC | Remover produto do diagnóstico |
+| `POST` | `/api/service-orders/{uuid}/diagnosis/complete` | ADMIN, MECHANIC | Concluir diagnóstico (gera orçamento + envia OTP) |
+| `POST` | `/api/service-orders/{uuid}/approval` | **Público (OTP)** | Aprovar ou rejeitar o orçamento |
+| `POST` | `/api/service-orders/{uuid}/otp/resend` | ADMIN, ATTENDANT | Reenviar OTP |
+| `POST` | `/api/service-orders/{uuid}/execution/products` | ADMIN, MECHANIC | Requisitar produto na execução (débito de estoque; item não orçado abre adendo + novo OTP) |
+| `DELETE` | `/api/service-orders/{uuid}/products/{productUuid}` | ADMIN, ATTENDANT | Devolver produto ao estoque (exige reautenticação por senha) |
+| `POST` | `/api/service-orders/{uuid}/execution/complete` | ADMIN, MECHANIC | Concluir execução |
+| `POST` | `/api/service-orders/{uuid}/delivery/accept` | **Público** | Aceitar entrega — Atendente via JWT ou Cliente via OTP |
+| `POST` | `/api/service-orders/{uuid}/delivery/reject` | **Público (OTP)** | Rejeitar entrega (volta para retrabalho) |
+| `POST` | `/api/service-orders/{uuid}/close-dispute` | ADMIN, ATTENDANT | Encerrar OS como `DISPUTED` |
+
+### Notificações
+
+| Método | Caminho | Papel | Descrição |
+|---|---|---|---|
+| `GET` | `/api/notifications` | ADMIN, ATTENDANT, MECHANIC | Listar notificações do usuário (paginado) |
+| `PATCH` | `/api/notifications/{uuid}/read` | ADMIN, ATTENDANT, MECHANIC | Marcar como lida |
 
 Toda transição de status persistida com sucesso — incluindo a abertura — dispara e-mail ao cliente
 com o identificador da OS e o novo status (falha de SMTP é logada e não reverte a transição).
@@ -513,46 +621,37 @@ RECEIVED → IN_DIAGNOSIS → AWAITING_APPROVAL → IN_PROGRESS → COMPLETED �
 
 ---
 
-## Postman Collection e Swagger
+## Collections e Swagger
 
 - **Swagger UI**: `http://localhost:8080/core/swagger-ui.html` (com a aplicação rodando localmente)
-- **Postman Collection**: [`collections/tech-challenge.postman_collection.json`](collections/tech-challenge.postman_collection.json) — todas as requisições organizadas por domínio de negócio e fluxos de uso, incluindo abertura de OS com itens opcionais e listagem priorizada
+- Duas collections, para propósitos diferentes:
 
-### Importando a collection
-
-1. Abra o Postman
-2. Clique em **Import**
-3. Selecione `collections/tech-challenge.postman_collection.json`
-4. As variáveis de collection são criadas automaticamente
-
-### Variáveis de collection
-
-| Variável | Descrição |
+| Pasta | Uso |
 |---|---|
-| `baseUrl` | URL base da API (padrão: `http://localhost:8080`) |
-| `accessToken` | JWT do Atendente — populado pelo Setup |
-| `accessTokenMechanic` | JWT do Mecânico — populado pelo Setup |
-| `customerUuid` | UUID do cliente cadastrado |
-| `vehicleUuid` | UUID do veículo cadastrado |
-| `serviceOrderUuid` | UUID da Ordem de Serviço aberta |
-| `mechanicalServiceUuid` | UUID do serviço mecânico do catálogo |
-| `productUuid` | UUID do produto no inventário |
+| [`collections/`](collections/) | Collection Postman organizada por domínio de negócio, para importar no Postman e explorar manualmente. `baseUrl` padrão `http://localhost:8080/core`. Documentação em [`collections/README.md`](collections/README.md). |
+| [`collection/`](collection/) | Collection de **validação ponta a ponta** contra o deploy no cluster, executável com **newman** (gerada por `collection/build.mjs`). Ciclo completo da OS com OTP lido do Mailpit + assertivas. Documentação em [`collection/README.md`](collection/README.md). |
 
-### Fluxo completo de teste (happy path)
+### Fluxo completo (happy path) exercitado pelas duas
 
-```
-Setup (pasta completa)
-  → Service Orders / Opening / Open Service Order
-  → Service Orders / Diagnosis / Start Diagnosis          (token mecânico)
-  → Service Orders / Diagnosis / Add Mechanical Service   (token mecânico)
-  → Service Orders / Diagnosis / Complete Diagnosis       (token mecânico)
-  → Service Orders / Quote Approval / Approve Quote       (sem token — cliente via OTP)
-  → Service Orders / Execution / Request Product          (token mecânico)
-  → Service Orders / Execution / Complete Execution       (token mecânico)
-  → Service Orders / Delivery / Accept Delivery (JWT)     (token atendente)
+```text
+Setup (usuários, catálogo, produto+estoque, cliente, veículo)
+  → Abrir OS → Consultar status (público)
+  → Diagnóstico: iniciar → adicionar serviço/produto → concluir (gera orçamento + OTP)
+  → Aprovar orçamento (cliente via OTP)
+  → Execução: requisitar produto (adendo + novo OTP) → aprovar adendo → concluir
+  → Aceitar entrega (Atendente via JWT) → status final DELIVERED
+  → Notificações: listar → marcar como lida
 ```
 
-> Documentação completa das pastas e variáveis em [`collections/README.md`](collections/README.md).
+### Rodando a collection de validação com newman
+
+```bash
+newman run collection/tech-challenge-api.postman_collection.json \
+  --reporters cli,json --reporter-json-export collection/newman-report.json
+```
+
+O `baseUrl` e `mailpitUrl` já vêm apontados para o NodePort do microk8s; ajuste em
+`collection/build.mjs` (e rode `node collection/build.mjs`) ou sobrescreva com `--env-var`.
 
 ---
 
@@ -588,7 +687,7 @@ o relatório completo localmente sem interromper o build na primeira falha, expo
 ### Autenticação e Autorização
 
 - **JWT RSA (RS256)** — tokens assinados com par de chaves RSA; chaves nunca commitadas, fornecidas via variável de ambiente
-- **RBAC** — papéis `MECHANIC` e `ATTENDANT`; `@PreAuthorize` em todos os endpoints protegidos
+- **RBAC** — papéis `ADMIN`, `ATTENDANT` e `MECHANIC` (`ADMIN` acumula as permissões de `ATTENDANT`); `@PreAuthorize` em todos os endpoints protegidos, com `@EnableMethodSecurity`
 - **Endpoints públicos** — consulta de status, aprovação de orçamento e vistoria de entrega acessíveis sem JWT (cliente acessa via OTP)
 
 ### Validações de Domínio

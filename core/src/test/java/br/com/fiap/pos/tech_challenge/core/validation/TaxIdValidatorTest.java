@@ -22,8 +22,6 @@ class TaxIdValidatorTest {
         ctx = mock(ConstraintValidatorContext.class);
     }
 
-    // ---- CPF ---
-
     @Test
     void isValid_returnsTrueForValidCpf() {
         assertThat(sut.isValid("529.982.247-25", ctx)).isTrue();
@@ -44,8 +42,6 @@ class TaxIdValidatorTest {
         assertThat(sut.isValid("529.982.247-00", ctx)).isFalse();
     }
 
-    // ---- CNPJ ----
-
     @Test
     void isValid_returnsTrueForValidCnpj() {
         assertThat(sut.isValid("11.222.333/0001-81", ctx)).isTrue();
@@ -65,8 +61,6 @@ class TaxIdValidatorTest {
     void isValid_returnsFalseForInvalidCnpjCheckDigit() {
         assertThat(sut.isValid("11.222.333/0001-00", ctx)).isFalse();
     }
-
-    // ---- edge cases ----
 
     @Test
     void isValid_returnsFalseForNull() {

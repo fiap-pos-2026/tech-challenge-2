@@ -1,488 +1,341 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Trivy Security Report — tech-challenge-1_core</title>
-  <style>
-    :root {
-      --bg: #0f1117;
-      --surface: #1a1d27;
-      --surface2: #22263a;
-      --border: #2e3250;
-      --text: #e2e8f0;
-      --muted: #7c88a8;
-      --accent: #6366f1;
-      --critical: #ef4444;
-      --high: #f97316;
-      --medium: #eab308;
-      --low: #22c55e;
-      --radius: 10px;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-      font-size: 14px;
-      line-height: 1.6;
-    }
-    .wrapper { max-width: 1100px; margin: 0 auto; padding: 40px 24px 64px; }
-
-    /* Header */
-    .header-top { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
-    .logo { width: 36px; height: 36px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
-    h1 { font-size: 22px; font-weight: 700; color: #fff; }
-    .subtitle { color: var(--muted); font-size: 13px; margin-top: 4px; }
-    header { margin-bottom: 40px; }
-
-    .meta-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
-    .meta-item { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 16px; }
-    .meta-label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-    .meta-value { font-weight: 600; color: var(--text); font-size: 13px; }
-
-    /* Cards */
-    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; margin-bottom: 40px; }
-    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; position: relative; overflow: hidden; }
-    .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
-    .card.total::before   { background: #6366f1; }
-    .card.critical::before { background: var(--critical); }
-    .card.high::before    { background: var(--high); }
-    .card.medium::before  { background: var(--medium); }
-    .card.low::before     { background: var(--low); }
-    .card.clean::before   { background: var(--low); }
-    .card-number { font-size: 34px; font-weight: 800; line-height: 1; margin-bottom: 5px; }
-    .card.total   .card-number { color: #a5b4fc; }
-    .card.critical .card-number { color: var(--critical); }
-    .card.high    .card-number { color: var(--high); }
-    .card.medium  .card-number { color: var(--medium); }
-    .card.low     .card-number { color: var(--low); }
-    .card.clean   .card-number { color: var(--low); }
-    .card-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
-
-    /* Section title */
-    .section-title { font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
-    .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
-
-    /* Clean banner */
-    .clean-banner {
-      background: rgba(34,197,94,.07);
-      border: 1px solid rgba(34,197,94,.25);
-      border-radius: var(--radius);
-      padding: 24px 28px;
-      display: flex;
-      align-items: center;
-      gap: 18px;
-      margin-bottom: 40px;
-    }
-    .clean-icon { font-size: 36px; flex-shrink: 0; }
-    .clean-title { font-size: 18px; font-weight: 700; color: var(--low); margin-bottom: 4px; }
-    .clean-sub { color: var(--muted); font-size: 13px; }
-
-    /* Resolved CVE */
-    .resolved-section { margin-bottom: 48px; }
-    .resolved-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-      opacity: .85;
-    }
-    .resolved-header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 16px;
-      padding: 16px 22px;
-      border-bottom: 1px solid var(--border);
-      flex-wrap: wrap;
-    }
-    .resolved-id { font-family: monospace; font-size: 13px; font-weight: 700; color: #a0aabb; text-decoration: line-through; }
-    .resolved-title { color: var(--muted); font-size: 12px; margin-top: 3px; max-width: 680px; }
-    .badge-resolved {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;
-      background: rgba(34,197,94,.12); color: var(--low); border: 1px solid rgba(34,197,94,.3);
-      white-space: nowrap; flex-shrink: 0;
-    }
-    .badge-medium-old {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600;
-      background: rgba(234,179,8,.08); color: #a08b20; border: 1px solid rgba(234,179,8,.2);
-      margin-left: 8px;
-    }
-    .resolved-body { padding: 16px 22px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-    @media (max-width: 600px) { .resolved-body { grid-template-columns: 1fr; } }
-    .field { display: flex; flex-direction: column; gap: 3px; }
-    .field-label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-    .field-value { font-size: 13px; color: #a0aabb; }
-    .field-value.mono { font-family: monospace; font-size: 12px; background: var(--surface2); padding: 3px 7px; border-radius: 4px; display: inline-block; }
-    .field-value.fixed-ok { color: var(--low); font-family: monospace; font-size: 12px; }
-    .before-after { display: flex; align-items: center; gap: 8px; font-family: monospace; font-size: 12px; }
-    .ver-old { color: #6b7894; background: var(--surface2); padding: 2px 8px; border-radius: 4px; text-decoration: line-through; }
-    .ver-arrow { color: var(--muted); }
-    .ver-new { color: var(--low); background: rgba(34,197,94,.1); padding: 2px 8px; border-radius: 4px; }
-
-    /* Package tables */
-    .target-section { margin-bottom: 24px; }
-    .target-header {
-      background: var(--surface2); border: 1px solid var(--border);
-      border-radius: var(--radius) var(--radius) 0 0; padding: 11px 18px;
-      display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none;
-    }
-    .target-header:hover { background: #282c42; }
-    .target-name { font-family: monospace; font-size: 13px; color: #c7d0e8; flex: 1; }
-    .pkg-count { font-size: 12px; color: var(--muted); }
-    .chevron { transition: transform .2s; color: var(--muted); }
-    .target-header.open .chevron { transform: rotate(180deg); }
-    .pkg-table-wrap { border: 1px solid var(--border); border-top: none; border-radius: 0 0 var(--radius) var(--radius); overflow: hidden; display: none; }
-    .pkg-table-wrap.open { display: block; }
-    table { width: 100%; border-collapse: collapse; font-size: 12px; }
-    thead tr { background: var(--surface); }
-    th { text-align: left; padding: 9px 14px; color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid var(--border); }
-    tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
-    tbody tr:last-child { border-bottom: none; }
-    tbody tr:hover { background: var(--surface2); }
-    td { padding: 8px 14px; color: #c7d0e8; vertical-align: middle; font-family: monospace; font-size: 12px; }
-    td.label { font-family: inherit; font-size: 12px; }
-    .license-tag { display: inline-block; font-size: 10px; background: var(--surface2); color: var(--muted); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border); margin: 1px; font-family: inherit; }
-
-    /* Search */
-    .search-row { display: flex; gap: 10px; margin-bottom: 12px; }
-    .search-input { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; color: var(--text); font-size: 13px; outline: none; transition: border-color .15s; }
-    .search-input:focus { border-color: var(--accent); }
-    .search-input::placeholder { color: var(--muted); }
-
-    footer { margin-top: 60px; text-align: center; color: var(--muted); font-size: 12px; }
-    code { background: var(--surface2); padding: 1px 6px; border-radius: 4px; font-family: monospace; }
-  </style>
+<meta charset="utf-8">
+<title>tech-challenge-core:local — Relatório Trivy</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #161d2e;
+    --border: #232c42;
+    --text: #e4e8f1;
+    --muted: #8a93a8;
+    --accent: #34d399;
+    --accent-dim: #10281f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    padding: 2.5rem 1.5rem 4rem;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin: 0 0 .25rem; }
+  .subtitle { color: var(--muted); margin: 0 0 2rem; font-size: .9rem; }
+  .banner {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    background: var(--accent-dim);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    font-weight: 600;
+    margin-bottom: 2rem;
+  }
+  .banner .n { font-size: 1.4rem; }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: .75rem;
+    margin-bottom: 2.5rem;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: .9rem 1rem;
+  }
+  .card .label { color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; margin-bottom: .3rem; }
+  .card .value { font-size: .95rem; word-break: break-word; }
+  section { margin-bottom: 2.5rem; }
+  section h2 {
+    font-size: 1.05rem;
+    display: flex;
+    align-items: baseline;
+    gap: .5rem;
+    margin-bottom: .9rem;
+  }
+  section h2 .count { color: var(--muted); font-weight: 400; font-size: .85rem; }
+  input[type=search] {
+    width: 100%;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: .55rem .8rem;
+    margin-bottom: .75rem;
+    font-size: .85rem;
+  }
+  input[type=search]:focus { outline: 1px solid var(--accent); }
+  .table-scroll {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: auto;
+    max-height: 420px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+  thead th {
+    position: sticky;
+    top: 0;
+    background: var(--panel);
+    text-align: left;
+    padding: .6rem .8rem;
+    color: var(--muted);
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+  }
+  tbody td { padding: .5rem .8rem; border-bottom: 1px solid var(--border); }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: rgba(255,255,255,.03); }
+  footer { color: var(--muted); font-size: .78rem; margin-top: 2.5rem; }
+</style>
 </head>
 <body>
-<div class="wrapper">
+<div class="wrap">
+  <h1>tech-challenge-core:local</h1>
+  <p class="subtitle">Relatório de vulnerabilidades gerado pelo Trivy 0.74.0 em 01/09/2026 12:23:15</p>
 
-  <!-- Header -->
-  <header>
-    <div class="header-top">
-      <div class="logo">🛡️</div>
-      <div>
-        <h1>Trivy Security Report</h1>
-        <div class="subtitle">Análise de vulnerabilidades da imagem de contêiner</div>
-      </div>
-    </div>
-    <div class="meta-row">
-      <div class="meta-item"><div class="meta-label">Imagem</div><div class="meta-value">tech-challenge-1_core:latest</div></div>
-      <div class="meta-item"><div class="meta-label">Sistema Operacional</div><div class="meta-value">Alpine Linux 3.23.5</div></div>
-      <div class="meta-item"><div class="meta-label">Java</div><div class="meta-value">OpenJDK 25.0.3+9</div></div>
-      <div class="meta-item"><div class="meta-label">Trivy</div><div class="meta-value">v0.71.2</div></div>
-      <div class="meta-item"><div class="meta-label">Data da varredura</div><div class="meta-value">29/06/2026</div></div>
-    </div>
-  </header>
+  <div class="banner"><span class="n">✓</span> Nenhuma vulnerabilidade encontrada em 185 pacotes analisados</div>
 
-  <!-- Summary Cards -->
   <div class="cards">
-    <div class="card total"><div class="card-number">182</div><div class="card-label">Pacotes analisados</div></div>
-    <div class="card critical"><div class="card-number">0</div><div class="card-label">Critical</div></div>
-    <div class="card high"><div class="card-number">0</div><div class="card-label">High</div></div>
-    <div class="card medium"><div class="card-number">0</div><div class="card-label">Medium</div></div>
-    <div class="card low"><div class="card-number">0</div><div class="card-label">Low</div></div>
-    <div class="card clean"><div class="card-number">182</div><div class="card-label">Sem CVE</div></div>
+    <div class="card"><div class="label">Imagem</div><div class="value">tech-challenge-core:local</div></div>
+    <div class="card"><div class="label">Digest</div><div class="value">30bff185012d</div></div>
+    <div class="card"><div class="label">Tamanho</div><div class="value">304.1 MB</div></div>
+    <div class="card"><div class="label">SO base</div><div class="value">alpine 3.24.1</div></div>
+    <div class="card"><div class="label">Pacotes SO</div><div class="value">44</div></div>
+    <div class="card"><div class="label">Dependências Java</div><div class="value">141</div></div>
+    <div class="card"><div class="label">Vulnerabilidades</div><div class="value">0</div></div>
+    <div class="card"><div class="label">Trivy</div><div class="value">v0.74.0</div></div>
   </div>
 
-  <!-- Clean banner -->
-  <div class="section-title">Resultado da varredura</div>
-  <div class="clean-banner">
-    <div class="clean-icon">✅</div>
-    <div>
-      <div class="clean-title">Nenhuma vulnerabilidade encontrada</div>
-      <div class="clean-sub">Todos os 182 pacotes analisados (Alpine OS + Java/Maven) estão livres de CVEs conhecidos nesta varredura.</div>
+  <section>
+    <h2>Pacotes do sistema operacional <span class="count">Alpine 3.24.1 — 44 pacotes</span></h2>
+    <input type="search" id="search-os" placeholder="Filtrar pacotes do SO…">
+    <div class="table-scroll">
+      <table id="table-os">
+        <thead><tr><th>Pacote</th><th>Versão</th><th>Arquitetura</th><th>Licença</th></tr></thead>
+        <tbody>
+<tr><td>acl-libs</td><td>2.3.2-r1</td><td>x86_64</td><td>LGPL-2.1-or-later, GPL-2.0-or-later</td></tr>
+<tr><td>alpine-baselayout</td><td>3.7.2-r1</td><td>x86_64</td><td>GPL-2.0-only</td></tr>
+<tr><td>alpine-baselayout-data</td><td>3.7.2-r1</td><td>x86_64</td><td>GPL-2.0-only</td></tr>
+<tr><td>alpine-keys</td><td>2.6-r0</td><td>x86_64</td><td>MIT</td></tr>
+<tr><td>alpine-release</td><td>3.24.1-r0</td><td>x86_64</td><td>MIT</td></tr>
+<tr><td>apk-tools</td><td>3.0.8-r0</td><td>x86_64</td><td>GPL-2.0-only</td></tr>
+<tr><td>brotli-libs</td><td>1.2.0-r1</td><td>x86_64</td><td>MIT</td></tr>
+<tr><td>busybox</td><td>1.37.0-r31</td><td>x86_64</td><td>GPL-2.0-only</td></tr>
+<tr><td>busybox-binsh</td><td>1.37.0-r31</td><td>x86_64</td><td>GPL-2.0-only</td></tr>
+<tr><td>ca-certificates</td><td>20260611-r0</td><td>x86_64</td><td>MPL-2.0, MIT</td></tr>
+<tr><td>ca-certificates-bundle</td><td>20260611-r0</td><td>x86_64</td><td>MPL-2.0, MIT</td></tr>
+<tr><td>coreutils</td><td>9.11-r0</td><td>x86_64</td><td>GPL-3.0-or-later</td></tr>
+<tr><td>coreutils-env</td><td>9.11-r0</td><td>x86_64</td><td>GPL-3.0-or-later</td></tr>
+<tr><td>coreutils-fmt</td><td>9.11-r0</td><td>x86_64</td><td>GPL-3.0-or-later</td></tr>
+<tr><td>coreutils-sha512sum</td><td>9.11-r0</td><td>x86_64</td><td>GPL-3.0-or-later</td></tr>
+<tr><td>encodings</td><td>1.1.0-r0</td><td>x86_64</td><td>Public, Domain</td></tr>
+<tr><td>font-dejavu</td><td>2.37-r6</td><td>x86_64</td><td>Bitstream-Vera</td></tr>
+<tr><td>fontconfig</td><td>2.17.1-r1</td><td>x86_64</td><td>MIT</td></tr>
+<tr><td>freetype</td><td>2.14.3-r0</td><td>x86_64</td><td>FTL, GPL-2.0-or-later</td></tr>
+<tr><td>libapk</td><td>3.0.8-r0</td><td>x86_64</td><td>GPL-2.0-only</td></tr>
+<tr><td>libattr</td><td>2.5.2-r2</td><td>x86_64</td><td>LGPL-2.1-or-later</td></tr>
+<tr><td>libbz2</td><td>1.0.8-r6</td><td>x86_64</td><td>bzip-2-1.0.6</td></tr>
+<tr><td>libcrypto3</td><td>3.5.8-r0</td><td>x86_64</td><td>Apache-2.0</td></tr>
+<tr><td>libexpat</td><td>2.8.4-r0</td><td>x86_64</td><td>MIT</td></tr>
+<tr><td>libffi</td><td>3.5.2-r1</td><td>x86_64</td><td>MIT</td></tr>
+<tr><td>libfontenc</td><td>1.1.9-r0</td><td>x86_64</td><td>MIT</td></tr>
+<tr><td>libintl</td><td>1.0-r0</td><td>x86_64</td><td>LGPL-2.1-or-later</td></tr>
+<tr><td>libpng</td><td>1.6.58-r1</td><td>x86_64</td><td>Libpng</td></tr>
+<tr><td>libssl3</td><td>3.5.8-r0</td><td>x86_64</td><td>Apache-2.0</td></tr>
+<tr><td>libtasn1</td><td>4.21.0-r0</td><td>x86_64</td><td>LGPL-2.1-or-later</td></tr>
+<tr><td>mkfontscale</td><td>1.2.4-r0</td><td>x86_64</td><td>MIT</td></tr>
+<tr><td>musl</td><td>1.2.6-r2</td><td>x86_64</td><td>MIT</td></tr>
+<tr><td>musl-locales</td><td>0.1.0-r1</td><td>x86_64</td><td>LGPL-3.0-only</td></tr>
+<tr><td>musl-locales-lang</td><td>0.1.0-r1</td><td>x86_64</td><td>MIT</td></tr>
+<tr><td>musl-utils</td><td>1.2.6-r2</td><td>x86_64</td><td>MIT, BSD-2-Clause, GPL-2.0-or-later</td></tr>
+<tr><td>openssl</td><td>3.5.8-r0</td><td>x86_64</td><td>Apache-2.0</td></tr>
+<tr><td>p11-kit</td><td>0.26.2-r0</td><td>x86_64</td><td>BSD-3-Clause</td></tr>
+<tr><td>p11-kit-trust</td><td>0.26.2-r0</td><td>x86_64</td><td>BSD-3-Clause</td></tr>
+<tr><td>scanelf</td><td>1.3.9-r1</td><td>x86_64</td><td>GPL-2.0-only</td></tr>
+<tr><td>skalibs-libs</td><td>2.15.0.0-r0</td><td>x86_64</td><td>ISC</td></tr>
+<tr><td>ssl_client</td><td>1.37.0-r31</td><td>x86_64</td><td>GPL-2.0-only</td></tr>
+<tr><td>tzdata</td><td>2026c-r0</td><td>x86_64</td><td>Public-Domain</td></tr>
+<tr><td>utmps-libs</td><td>0.1.3.3-r0</td><td>x86_64</td><td>ISC</td></tr>
+<tr><td>zlib</td><td>1.3.2-r0</td><td>x86_64</td><td>Zlib</td></tr>
+        </tbody>
+      </table>
     </div>
-  </div>
+  </section>
 
-  <!-- Resolved CVE -->
-  <div class="resolved-section">
-    <div class="section-title">Vulnerabilidade corrigida nesta versão</div>
-    <div class="resolved-card">
-      <div class="resolved-header">
-        <div>
-          <div>
-            <span class="resolved-id">CVE-2026-54515</span>
-            <span class="badge-medium-old">MEDIUM · CVSS 5.3</span>
-          </div>
-          <div class="resolved-title">jackson-databind — @JsonIgnoreProperties bypass via ACCEPT_CASE_INSENSITIVE_PROPERTIES (CWE-915)</div>
-        </div>
-        <span class="badge-resolved">✔ CORRIGIDA</span>
-      </div>
-      <div class="resolved-body">
-        <div class="field">
-          <span class="field-label">Pacote</span>
-          <span class="field-value mono">com.fasterxml.jackson.core:jackson-databind</span>
-        </div>
-        <div class="field">
-          <span class="field-label">Versão atualizada</span>
-          <div class="before-after">
-            <span class="ver-old">2.21.4</span>
-            <span class="ver-arrow">→</span>
-            <span class="ver-new">2.22.0</span>
-          </div>
-        </div>
-        <div class="field">
-          <span class="field-label">Caminho</span>
-          <span class="field-value mono">app/lib/jackson-databind-2.22.0.jar</span>
-        </div>
-        <div class="field">
-          <span class="field-label">Fonte</span>
-          <span class="field-value">GitHub Security Advisory Maven (GHSA-5jmj-h7xm-6q6v)</span>
-        </div>
-      </div>
+  <section>
+    <h2>Dependências Java <span class="count">141 bibliotecas empacotadas em app/lib</span></h2>
+    <input type="search" id="search-lang" placeholder="Filtrar dependências Java…">
+    <div class="table-scroll">
+      <table id="table-lang">
+        <thead><tr><th>Biblioteca</th><th>Versão</th><th>Licença</th><th>Arquivo</th></tr></thead>
+        <tbody>
+<tr><td>ch.qos.logback:logback-classic</td><td>1.5.34</td><td>EPL-2.0, LGPL-2.1-only</td><td>logback-classic-1.5.34.jar</td></tr>
+<tr><td>ch.qos.logback:logback-core</td><td>1.5.34</td><td>EPL-2.0, LGPL-2.1-only</td><td>logback-core-1.5.34.jar</td></tr>
+<tr><td>com.fasterxml.jackson.core:jackson-annotations</td><td>2.21</td><td>Apache-2.0</td><td>jackson-annotations-2.21.jar</td></tr>
+<tr><td>com.fasterxml.jackson.core:jackson-core</td><td>2.21.4</td><td>Apache-2.0</td><td>jackson-core-2.21.4.jar</td></tr>
+<tr><td>com.fasterxml.jackson.core:jackson-databind</td><td>2.22.1</td><td>Apache-2.0</td><td>jackson-databind-2.22.1.jar</td></tr>
+<tr><td>com.fasterxml.jackson.dataformat:jackson-dataformat-yaml</td><td>2.21.4</td><td>Apache-2.0</td><td>jackson-dataformat-yaml-2.21.4.jar</td></tr>
+<tr><td>com.fasterxml.jackson.datatype:jackson-datatype-jsr310</td><td>2.21.4</td><td>Apache-2.0</td><td>jackson-datatype-jsr310-2.21.4.jar</td></tr>
+<tr><td>com.fasterxml:classmate</td><td>1.7.3</td><td>Apache-2.0</td><td>classmate-1.7.3.jar</td></tr>
+<tr><td>com.github.ben-manes.caffeine:caffeine</td><td>3.2.4</td><td>Apache-2.0</td><td>caffeine-3.2.4.jar</td></tr>
+<tr><td>com.github.stephenc.jcip:jcip-annotations</td><td>1.0-1</td><td>Apache-2.0</td><td>nimbus-jose-jwt-10.9.jar</td></tr>
+<tr><td>com.google.code.gson:gson</td><td>2.13.1</td><td>Apache-2.0</td><td>nimbus-jose-jwt-10.9.jar</td></tr>
+<tr><td>com.google.errorprone:error_prone_annotations</td><td>2.49.0</td><td>Apache-2.0</td><td>error_prone_annotations-2.49.0.jar</td></tr>
+<tr><td>com.nimbusds:nimbus-jose-jwt</td><td>10.9</td><td>Apache-2.0</td><td>nimbus-jose-jwt-10.9.jar</td></tr>
+<tr><td>com.opencsv:opencsv</td><td>5.12.0</td><td>Apache-2.0</td><td>opencsv-5.12.0.jar</td></tr>
+<tr><td>com.sun.istack:istack-commons-runtime</td><td>4.1.2</td><td>BSD-3-Clause</td><td>istack-commons-runtime-4.1.2.jar</td></tr>
+<tr><td>com.zaxxer:HikariCP</td><td>7.0.2</td><td>Apache-2.0</td><td>HikariCP-7.0.2.jar</td></tr>
+<tr><td>commons-io:commons-io</td><td>2.22.0</td><td>Apache-2.0</td><td>commons-io-2.22.0.jar</td></tr>
+<tr><td>commons-logging:commons-logging</td><td>1.3.6</td><td>Apache-2.0</td><td>commons-logging-1.3.6.jar</td></tr>
+<tr><td>io.lettuce:lettuce-core</td><td>7.5.2.RELEASE</td><td>MIT</td><td>lettuce-core-7.5.2.RELEASE.jar</td></tr>
+<tr><td>io.micrometer:micrometer-commons</td><td>1.17.0</td><td>Apache-2.0</td><td>micrometer-commons-1.17.0.jar</td></tr>
+<tr><td>io.micrometer:micrometer-core</td><td>1.17.0</td><td>Apache-2.0</td><td>micrometer-core-1.17.0.jar</td></tr>
+<tr><td>io.micrometer:micrometer-jakarta9</td><td>1.17.0</td><td>Apache-2.0</td><td>micrometer-jakarta9-1.17.0.jar</td></tr>
+<tr><td>io.micrometer:micrometer-observation</td><td>1.17.0</td><td>Apache-2.0</td><td>micrometer-observation-1.17.0.jar</td></tr>
+<tr><td>io.netty:netty-buffer</td><td>4.2.16.Final</td><td>Apache-2.0</td><td>netty-buffer-4.2.16.Final.jar</td></tr>
+<tr><td>io.netty:netty-codec-base</td><td>4.2.16.Final</td><td>Apache-2.0</td><td>netty-codec-base-4.2.16.Final.jar</td></tr>
+<tr><td>io.netty:netty-codec-dns</td><td>4.2.16.Final</td><td>Apache-2.0</td><td>netty-codec-dns-4.2.16.Final.jar</td></tr>
+<tr><td>io.netty:netty-common</td><td>4.2.16.Final</td><td>—</td><td>netty-common-4.2.16.Final.jar</td></tr>
+<tr><td>io.netty:netty-handler</td><td>4.2.16.Final</td><td>Apache-2.0</td><td>netty-handler-4.2.16.Final.jar</td></tr>
+<tr><td>io.netty:netty-resolver</td><td>4.2.16.Final</td><td>Apache-2.0</td><td>netty-resolver-4.2.16.Final.jar</td></tr>
+<tr><td>io.netty:netty-resolver-dns</td><td>4.2.16.Final</td><td>Apache-2.0</td><td>netty-resolver-dns-4.2.16.Final.jar</td></tr>
+<tr><td>io.netty:netty-transport</td><td>4.2.16.Final</td><td>Apache-2.0</td><td>netty-transport-4.2.16.Final.jar</td></tr>
+<tr><td>io.netty:netty-transport-native-unix-common</td><td>4.2.16.Final</td><td>Apache-2.0</td><td>netty-transport-native-unix-common-4.2.16.Final.jar</td></tr>
+<tr><td>io.projectreactor:reactor-core</td><td>3.8.6</td><td>Apache-2.0</td><td>reactor-core-3.8.6.jar</td></tr>
+<tr><td>io.swagger.core.v3:swagger-annotations-jakarta</td><td>2.2.47</td><td>Apache-2.0</td><td>swagger-annotations-jakarta-2.2.47.jar</td></tr>
+<tr><td>io.swagger.core.v3:swagger-core-jakarta</td><td>2.2.47</td><td>Apache-2.0</td><td>swagger-core-jakarta-2.2.47.jar</td></tr>
+<tr><td>io.swagger.core.v3:swagger-models-jakarta</td><td>2.2.47</td><td>Apache-2.0</td><td>swagger-models-jakarta-2.2.47.jar</td></tr>
+<tr><td>jakarta.activation:jakarta.activation-api</td><td>2.1.4</td><td>BSD-3-Clause</td><td>jakarta.activation-api-2.1.4.jar</td></tr>
+<tr><td>jakarta.annotation:jakarta.annotation-api</td><td>3.0.0</td><td>EPL-2.0, GPL-2.0-with-classpath-exception</td><td>jakarta.annotation-api-3.0.0.jar</td></tr>
+<tr><td>jakarta.inject:jakarta.inject-api</td><td>2.0.1</td><td>Apache-2.0</td><td>jakarta.inject-api-2.0.1.jar</td></tr>
+<tr><td>jakarta.mail:jakarta.mail-api</td><td>2.1.5</td><td>EPL-2.0, GPL-2.0-with-classpath-exception, BSD-3-Clause</td><td>jakarta.mail-api-2.1.5.jar</td></tr>
+<tr><td>jakarta.persistence:jakarta.persistence-api</td><td>3.2.0</td><td>EPL-2.0, BSD-3-Clause</td><td>jakarta.persistence-api-3.2.0.jar</td></tr>
+<tr><td>jakarta.transaction:jakarta.transaction-api</td><td>2.0.1</td><td>EPL-2.0, GPL-2.0-with-classpath-exception</td><td>jakarta.transaction-api-2.0.1.jar</td></tr>
+<tr><td>jakarta.validation:jakarta.validation-api</td><td>3.1.1</td><td>Apache-2.0</td><td>jakarta.validation-api-3.1.1.jar</td></tr>
+<tr><td>jakarta.xml.bind:jakarta.xml.bind-api</td><td>4.0.5</td><td>BSD-3-Clause</td><td>jakarta.xml.bind-api-4.0.5.jar</td></tr>
+<tr><td>net.bytebuddy:byte-buddy</td><td>1.18.10</td><td>Apache-2.0</td><td>byte-buddy-1.18.10.jar</td></tr>
+<tr><td>org.antlr:antlr4-runtime</td><td>4.13.2</td><td>—</td><td>antlr4-runtime-4.13.2.jar</td></tr>
+<tr><td>org.apache.commons:commons-collections4</td><td>4.5.0</td><td>Apache-2.0</td><td>commons-collections4-4.5.0.jar</td></tr>
+<tr><td>org.apache.commons:commons-lang3</td><td>3.20.0</td><td>Apache-2.0</td><td>commons-lang3-3.20.0.jar</td></tr>
+<tr><td>org.apache.commons:commons-text</td><td>1.15.0</td><td>Apache-2.0</td><td>commons-text-1.15.0.jar</td></tr>
+<tr><td>org.apache.logging.log4j:log4j-api</td><td>2.25.5</td><td>Apache-2.0</td><td>log4j-api-2.25.5.jar</td></tr>
+<tr><td>org.apache.logging.log4j:log4j-to-slf4j</td><td>2.25.5</td><td>Apache-2.0</td><td>log4j-to-slf4j-2.25.5.jar</td></tr>
+<tr><td>org.apache.tomcat.embed:tomcat-embed-core</td><td>11.0.22</td><td>Apache-2.0</td><td>tomcat-embed-core-11.0.22.jar</td></tr>
+<tr><td>org.apache.tomcat.embed:tomcat-embed-el</td><td>11.0.22</td><td>Apache-2.0</td><td>tomcat-embed-el-11.0.22.jar</td></tr>
+<tr><td>org.apache.tomcat.embed:tomcat-embed-websocket</td><td>11.0.22</td><td>Apache-2.0</td><td>tomcat-embed-websocket-11.0.22.jar</td></tr>
+<tr><td>org.aspectj:aspectjweaver</td><td>1.9.25.1</td><td>—</td><td>aspectjweaver-1.9.25.1.jar</td></tr>
+<tr><td>org.eclipse.angus:angus-activation</td><td>2.0.3</td><td>BSD-3-Clause</td><td>angus-activation-2.0.3.jar</td></tr>
+<tr><td>org.eclipse.angus:angus-core</td><td>2.0.5</td><td>—</td><td>angus-mail-2.0.5.jar</td></tr>
+<tr><td>org.eclipse.angus:angus-mail</td><td>2.0.5</td><td>—</td><td>angus-mail-2.0.5.jar</td></tr>
+<tr><td>org.eclipse.angus:imap</td><td>2.0.5</td><td>—</td><td>angus-mail-2.0.5.jar</td></tr>
+<tr><td>org.eclipse.angus:logging-mailhandler</td><td>2.0.5</td><td>—</td><td>angus-mail-2.0.5.jar</td></tr>
+<tr><td>org.eclipse.angus:pop3</td><td>2.0.5</td><td>—</td><td>angus-mail-2.0.5.jar</td></tr>
+<tr><td>org.eclipse.angus:smtp</td><td>2.0.5</td><td>—</td><td>angus-mail-2.0.5.jar</td></tr>
+<tr><td>org.glassfish.jaxb:jaxb-core</td><td>4.0.9</td><td>BSD-3-Clause</td><td>jaxb-core-4.0.9.jar</td></tr>
+<tr><td>org.glassfish.jaxb:jaxb-runtime</td><td>4.0.9</td><td>BSD-3-Clause</td><td>jaxb-runtime-4.0.9.jar</td></tr>
+<tr><td>org.glassfish.jaxb:txw2</td><td>4.0.9</td><td>BSD-3-Clause</td><td>txw2-4.0.9.jar</td></tr>
+<tr><td>org.hdrhistogram:HdrHistogram</td><td>2.2.2</td><td>CC0-1.0, BSD-2-Clause</td><td>HdrHistogram-2.2.2.jar</td></tr>
+<tr><td>org.hibernate.models:hibernate-models</td><td>1.1.0</td><td>Apache-2.0</td><td>hibernate-models-1.1.1.jar</td></tr>
+<tr><td>org.hibernate.validator:hibernate-validator</td><td>9.1.0.Final</td><td>Apache-2.0</td><td>hibernate-validator-9.1.0.Final.jar</td></tr>
+<tr><td>org.hibernate:hibernate-core</td><td>7.4.1.Final</td><td>Apache-2.0</td><td>hibernate-core-7.4.1.Final.jar</td></tr>
+<tr><td>org.jboss.logging:jboss-logging</td><td>3.6.3.Final</td><td>Apache-2.0</td><td>jboss-logging-3.6.3.Final.jar</td></tr>
+<tr><td>org.jctools:jctools-core</td><td>4.0.6</td><td>Apache-2.0</td><td>netty-common-4.2.16.Final.jar</td></tr>
+<tr><td>org.jspecify:jspecify</td><td>1.0.0</td><td>—</td><td>jspecify-1.0.0.jar</td></tr>
+<tr><td>org.liquibase:liquibase-core</td><td>5.0.3</td><td>FSL-1.1-ALv2</td><td>liquibase-core-5.0.3.jar</td></tr>
+<tr><td>org.mapstruct:mapstruct</td><td>1.6.3</td><td>Apache-2.0</td><td>mapstruct-1.6.3.jar</td></tr>
+<tr><td>org.postgresql:postgresql</td><td>42.7.12</td><td>BSD-2-Clause</td><td>postgresql-42.7.12.jar</td></tr>
+<tr><td>org.reactivestreams:reactive-streams</td><td>1.0.4</td><td>—</td><td>reactive-streams-1.0.4.jar</td></tr>
+<tr><td>org.slf4j:jul-to-slf4j</td><td>2.0.18</td><td>MIT</td><td>jul-to-slf4j-2.0.18.jar</td></tr>
+<tr><td>org.slf4j:slf4j-api</td><td>2.0.18</td><td>MIT</td><td>slf4j-api-2.0.18.jar</td></tr>
+<tr><td>org.springdoc:springdoc-openapi-starter-common</td><td>3.0.3</td><td>—</td><td>springdoc-openapi-starter-common-3.0.3.jar</td></tr>
+<tr><td>org.springdoc:springdoc-openapi-starter-webmvc-api</td><td>3.0.3</td><td>—</td><td>springdoc-openapi-starter-webmvc-api-3.0.3.jar</td></tr>
+<tr><td>org.springdoc:springdoc-openapi-starter-webmvc-ui</td><td>3.0.3</td><td>—</td><td>springdoc-openapi-starter-webmvc-ui-3.0.3.jar</td></tr>
+<tr><td>org.springframework.boot:spring-boot</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-boot-4.1.0.jar</td></tr>
+<tr><td>org.springframework.boot:spring-boot-actuator</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-boot-actuator-4.1.0.jar</td></tr>
+<tr><td>org.springframework.boot:spring-boot-actuator-autoconfigure</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-boot-actuator-autoconfigure-4.1.0.jar</td></tr>
+<tr><td>org.springframework.boot:spring-boot-autoconfigure</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-boot-autoconfigure-4.1.0.jar</td></tr>
+<tr><td>org.springframework.boot:spring-boot-data-commons</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-boot-data-commons-4.1.0.jar</td></tr>
+<tr><td>org.springframework.boot:spring-boot-data-jpa</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-boot-data-jpa-4.1.0.jar</td></tr>
+<tr><td>org.springframework.boot:spring-boot-data-redis</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-boot-data-redis-4.1.0.jar</td></tr>
+<tr><td>org.springframework.boot:spring-boot-health</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-boot-health-4.1.0.jar</td></tr>
+<tr><td>org.springframework.boot:spring-boot-hibernate</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-boot-hibernate-4.1.0.jar</td></tr>
+<tr><td>org.springframework.boot:spring-boot-http-converter</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-boot-http-converter-4.1.0.jar</td></tr>
+<tr><td>org.springframework.boot:spring-boot-jackson</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-boot-jackson-4.1.0.jar</td></tr>
+<tr><td>org.springframework.boot:spring-boot-jarmode-tools</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-boot-jarmode-tools-4.1.0.jar</td></tr>
+<tr><td>org.springframework.boot:spring-boot-jdbc</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-boot-jdbc-4.1.0.jar</td></tr>
+<tr><td>org.springframework.boot:spring-boot-jpa</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-boot-jpa-4.1.0.jar</td></tr>
+<tr><td>org.springframework.boot:spring-boot-liquibase</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-boot-liquibase-4.1.0.jar</td></tr>
+<tr><td>org.springframework.boot:spring-boot-mail</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-boot-mail-4.1.0.jar</td></tr>
+<tr><td>org.springframework.boot:spring-boot-micrometer-metrics</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-boot-micrometer-metrics-4.1.0.jar</td></tr>
+<tr><td>org.springframework.boot:spring-boot-micrometer-observation</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-boot-micrometer-observation-4.1.0.jar</td></tr>
+<tr><td>org.springframework.boot:spring-boot-netty</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-boot-netty-4.1.0.jar</td></tr>
+<tr><td>org.springframework.boot:spring-boot-persistence</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-boot-persistence-4.1.0.jar</td></tr>
+<tr><td>org.springframework.boot:spring-boot-security</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-boot-security-4.1.0.jar</td></tr>
+<tr><td>org.springframework.boot:spring-boot-security-oauth2-resource-server</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-boot-security-oauth2-resource-server-4.1.0.jar</td></tr>
+<tr><td>org.springframework.boot:spring-boot-servlet</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-boot-servlet-4.1.0.jar</td></tr>
+<tr><td>org.springframework.boot:spring-boot-sql</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-boot-sql-4.1.0.jar</td></tr>
+<tr><td>org.springframework.boot:spring-boot-tomcat</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-boot-tomcat-4.1.0.jar</td></tr>
+<tr><td>org.springframework.boot:spring-boot-transaction</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-boot-transaction-4.1.0.jar</td></tr>
+<tr><td>org.springframework.boot:spring-boot-validation</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-boot-validation-4.1.0.jar</td></tr>
+<tr><td>org.springframework.boot:spring-boot-web-server</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-boot-web-server-4.1.0.jar</td></tr>
+<tr><td>org.springframework.boot:spring-boot-webmvc</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-boot-webmvc-4.1.0.jar</td></tr>
+<tr><td>org.springframework.data:spring-data-commons</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-data-commons-4.1.0.jar</td></tr>
+<tr><td>org.springframework.data:spring-data-jpa</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-data-jpa-4.1.0.jar</td></tr>
+<tr><td>org.springframework.data:spring-data-keyvalue</td><td>4.1.0</td><td>Apache-2.0, BSD-3-Clause</td><td>spring-data-keyvalue-4.1.0.jar</td></tr>
+<tr><td>org.springframework.data:spring-data-redis</td><td>4.1.0</td><td>Apache-2.0</td><td>spring-data-redis-4.1.0.jar</td></tr>
+<tr><td>org.springframework.security:spring-security-config</td><td>7.1.0</td><td>Apache-2.0</td><td>spring-security-config-7.1.0.jar</td></tr>
+<tr><td>org.springframework.security:spring-security-core</td><td>7.1.0</td><td>Apache-2.0</td><td>spring-security-core-7.1.0.jar</td></tr>
+<tr><td>org.springframework.security:spring-security-crypto</td><td>7.1.0</td><td>Apache-2.0</td><td>spring-security-crypto-7.1.0.jar</td></tr>
+<tr><td>org.springframework.security:spring-security-oauth2-core</td><td>7.1.0</td><td>Apache-2.0</td><td>spring-security-oauth2-core-7.1.0.jar</td></tr>
+<tr><td>org.springframework.security:spring-security-oauth2-jose</td><td>7.1.0</td><td>Apache-2.0</td><td>spring-security-oauth2-jose-7.1.0.jar</td></tr>
+<tr><td>org.springframework.security:spring-security-oauth2-resource-server</td><td>7.1.0</td><td>Apache-2.0</td><td>spring-security-oauth2-resource-server-7.1.0.jar</td></tr>
+<tr><td>org.springframework.security:spring-security-web</td><td>7.1.0</td><td>Apache-2.0</td><td>spring-security-web-7.1.0.jar</td></tr>
+<tr><td>org.springframework:spring-aop</td><td>7.0.8</td><td>Apache-2.0, BSD-3-Clause</td><td>spring-aop-7.0.8.jar</td></tr>
+<tr><td>org.springframework:spring-aspects</td><td>7.0.8</td><td>Apache-2.0, BSD-3-Clause</td><td>spring-aspects-7.0.8.jar</td></tr>
+<tr><td>org.springframework:spring-beans</td><td>7.0.8</td><td>Apache-2.0, BSD-3-Clause</td><td>spring-beans-7.0.8.jar</td></tr>
+<tr><td>org.springframework:spring-context</td><td>7.0.8</td><td>Apache-2.0, BSD-3-Clause</td><td>spring-context-7.0.8.jar</td></tr>
+<tr><td>org.springframework:spring-context-support</td><td>7.0.8</td><td>Apache-2.0, BSD-3-Clause</td><td>spring-context-support-7.0.8.jar</td></tr>
+<tr><td>org.springframework:spring-core</td><td>7.0.8</td><td>Apache-2.0, BSD-3-Clause</td><td>spring-core-7.0.8.jar</td></tr>
+<tr><td>org.springframework:spring-expression</td><td>7.0.8</td><td>Apache-2.0, BSD-3-Clause</td><td>spring-expression-7.0.8.jar</td></tr>
+<tr><td>org.springframework:spring-jdbc</td><td>7.0.8</td><td>Apache-2.0, BSD-3-Clause</td><td>spring-jdbc-7.0.8.jar</td></tr>
+<tr><td>org.springframework:spring-messaging</td><td>7.0.8</td><td>Apache-2.0, BSD-3-Clause</td><td>spring-messaging-7.0.8.jar</td></tr>
+<tr><td>org.springframework:spring-orm</td><td>7.0.8</td><td>Apache-2.0, BSD-3-Clause</td><td>spring-orm-7.0.8.jar</td></tr>
+<tr><td>org.springframework:spring-oxm</td><td>7.0.8</td><td>Apache-2.0, BSD-3-Clause</td><td>spring-oxm-7.0.8.jar</td></tr>
+<tr><td>org.springframework:spring-tx</td><td>7.0.8</td><td>Apache-2.0, BSD-3-Clause</td><td>spring-tx-7.0.8.jar</td></tr>
+<tr><td>org.springframework:spring-web</td><td>7.0.8</td><td>Apache-2.0, BSD-3-Clause</td><td>spring-web-7.0.8.jar</td></tr>
+<tr><td>org.springframework:spring-webmvc</td><td>7.0.8</td><td>Apache-2.0, BSD-3-Clause</td><td>spring-webmvc-7.0.8.jar</td></tr>
+<tr><td>org.webjars:swagger-ui</td><td>5.32.2</td><td>Apache-2.0</td><td>swagger-ui-5.32.2.jar</td></tr>
+<tr><td>org.webjars:webjars-locator-lite</td><td>1.1.3</td><td>MIT</td><td>webjars-locator-lite-1.1.3.jar</td></tr>
+<tr><td>org.yaml:snakeyaml</td><td>2.6</td><td>Apache-2.0</td><td>snakeyaml-2.6.jar</td></tr>
+<tr><td>redis.clients.authentication:redis-authx-core</td><td>0.1.1-beta2</td><td>MIT</td><td>redis-authx-core-0.1.1-beta2.jar</td></tr>
+<tr><td>tools.jackson.core:jackson-core</td><td>3.1.5</td><td>Apache-2.0</td><td>jackson-core-3.1.5.jar</td></tr>
+<tr><td>tools.jackson.core:jackson-databind</td><td>3.1.5</td><td>Apache-2.0</td><td>jackson-databind-3.1.5.jar</td></tr>
+        </tbody>
+      </table>
     </div>
-  </div>
+  </section>
 
-  <!-- Package Inventory -->
-  <div>
-    <div class="section-title">Inventário de pacotes</div>
-    <div class="search-row">
-      <input class="search-input" type="text" id="pkgSearch" placeholder="Filtrar por nome de pacote..." oninput="filterPackages()" />
-    </div>
-
-    <!-- Alpine OS Packages -->
-    <div class="target-section">
-      <div class="target-header" onclick="toggleTarget(this)">
-        <span style="font-size:15px">🐧</span>
-        <span class="target-name">tech-challenge-1_core (alpine 3.23.5)</span>
-        <span class="pkg-count">41 pacotes OS</span>
-        <span class="chevron">▾</span>
-      </div>
-      <div class="pkg-table-wrap" id="alpine-table">
-        <table id="alpine-pkg-table">
-          <thead><tr><th>Pacote</th><th>Versão</th><th>Licença(s)</th></tr></thead>
-          <tbody>
-            <tr><td>acl-libs</td><td>2.3.2-r1</td><td class="label"><span class="license-tag">LGPL-2.1-or-later</span><span class="license-tag">GPL-2.0-or-later</span></td></tr>
-            <tr><td>alpine-baselayout</td><td>3.7.2-r0</td><td class="label"><span class="license-tag">GPL-2.0-only</span></td></tr>
-            <tr><td>alpine-baselayout-data</td><td>3.7.2-r0</td><td class="label"><span class="license-tag">GPL-2.0-only</span></td></tr>
-            <tr><td>alpine-keys</td><td>2.6-r0</td><td class="label"><span class="license-tag">MIT</span></td></tr>
-            <tr><td>alpine-release</td><td>3.23.5-r0</td><td class="label"><span class="license-tag">MIT</span></td></tr>
-            <tr><td>apk-tools</td><td>3.0.6-r0</td><td class="label"><span class="license-tag">GPL-2.0-only</span></td></tr>
-            <tr><td>brotli-libs</td><td>1.2.0-r0</td><td class="label"><span class="license-tag">MIT</span></td></tr>
-            <tr><td>busybox</td><td>1.37.0-r30</td><td class="label"><span class="license-tag">GPL-2.0-only</span></td></tr>
-            <tr><td>busybox-binsh</td><td>1.37.0-r30</td><td class="label"><span class="license-tag">GPL-2.0-only</span></td></tr>
-            <tr><td>ca-certificates</td><td>20260611-r0</td><td class="label"><span class="license-tag">MPL-2.0</span><span class="license-tag">MIT</span></td></tr>
-            <tr><td>ca-certificates-bundle</td><td>20260611-r0</td><td class="label"><span class="license-tag">MPL-2.0</span><span class="license-tag">MIT</span></td></tr>
-            <tr><td>coreutils</td><td>9.8-r1</td><td class="label"><span class="license-tag">GPL-3.0-or-later</span></td></tr>
-            <tr><td>coreutils-env</td><td>9.8-r1</td><td class="label"><span class="license-tag">GPL-3.0-or-later</span></td></tr>
-            <tr><td>coreutils-fmt</td><td>9.8-r1</td><td class="label"><span class="license-tag">GPL-3.0-or-later</span></td></tr>
-            <tr><td>coreutils-sha512sum</td><td>9.8-r1</td><td class="label"><span class="license-tag">GPL-3.0-or-later</span></td></tr>
-            <tr><td>encodings</td><td>1.1.0-r0</td><td class="label"><span class="license-tag">Public Domain</span></td></tr>
-            <tr><td>font-dejavu</td><td>2.37-r6</td><td class="label"><span class="license-tag">Bitstream-Vera</span></td></tr>
-            <tr><td>fontconfig</td><td>2.17.1-r0</td><td class="label"><span class="license-tag">MIT</span></td></tr>
-            <tr><td>freetype</td><td>2.14.1-r0</td><td class="label"><span class="license-tag">FTL</span><span class="license-tag">GPL-2.0-or-later</span></td></tr>
-            <tr><td>keyutils-libs</td><td>1.6.3-r4</td><td class="label"><span class="license-tag">GPL-2.0-or-later</span><span class="license-tag">LGPL-2.0-or-later</span></td></tr>
-            <tr><td>krb5-conf</td><td>1.0-r2</td><td class="label"><span class="license-tag">MIT</span></td></tr>
-            <tr><td>krb5-libs</td><td>1.21.3-r2</td><td class="label"><span class="license-tag">MIT</span></td></tr>
-            <tr><td>libapk</td><td>3.0.6-r0</td><td class="label"><span class="license-tag">GPL-2.0-only</span></td></tr>
-            <tr><td>libattr</td><td>2.5.2-r2</td><td class="label"><span class="license-tag">LGPL-2.1-or-later</span></td></tr>
-            <tr><td>libcom_err</td><td>1.47.3-r0</td><td class="label"><span class="license-tag">MIT</span></td></tr>
-            <tr><td>libcrypto3</td><td>3.5.7-r0</td><td class="label"><span class="license-tag">Apache-2.0</span></td></tr>
-            <tr><td>libexpat</td><td>2.8.1-r0</td><td class="label"><span class="license-tag">MIT</span></td></tr>
-            <tr><td>libssl3</td><td>3.5.7-r0</td><td class="label"><span class="license-tag">Apache-2.0</span></td></tr>
-            <tr><td>libverto</td><td>0.3.2-r2</td><td class="label"><span class="license-tag">MIT</span></td></tr>
-            <tr><td>mkfontscale</td><td>1.2.3-r1</td><td class="label"><span class="license-tag">MIT</span></td></tr>
-            <tr><td>musl</td><td>1.2.5-r23</td><td class="label"><span class="license-tag">MIT</span></td></tr>
-            <tr><td>musl-locales</td><td>0.1-r0</td><td class="label"><span class="license-tag">MIT</span><span class="license-tag">LGPL-2.1-or-later</span></td></tr>
-            <tr><td>musl-locales-lang</td><td>0.1-r0</td><td class="label"><span class="license-tag">MIT</span></td></tr>
-            <tr><td>openssl</td><td>3.5.7-r0</td><td class="label"><span class="license-tag">Apache-2.0</span></td></tr>
-            <tr><td>p11-kit</td><td>0.25.5-r0</td><td class="label"><span class="license-tag">BSD-3-Clause</span></td></tr>
-            <tr><td>p11-kit-trust</td><td>0.25.5-r0</td><td class="label"><span class="license-tag">BSD-3-Clause</span></td></tr>
-            <tr><td>scanelf</td><td>1.3.8-r0</td><td class="label"><span class="license-tag">GPL-2.0-only</span></td></tr>
-            <tr><td>ssl_client</td><td>1.37.0-r30</td><td class="label"><span class="license-tag">GPL-2.0-only</span></td></tr>
-            <tr><td>tzdata</td><td>2025b-r0</td><td class="label"><span class="license-tag">Public Domain</span></td></tr>
-            <tr><td>utmps-libs</td><td>0.1.3.1-r0</td><td class="label"><span class="license-tag">ISC</span></td></tr>
-            <tr><td>zlib</td><td>1.3.2-r0</td><td class="label"><span class="license-tag">Zlib</span></td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Java Packages -->
-    <div class="target-section">
-      <div class="target-header" onclick="toggleTarget(this)">
-        <span style="font-size:15px">☕</span>
-        <span class="target-name">Java (JAR libraries)</span>
-        <span class="pkg-count">141 pacotes Maven</span>
-        <span class="chevron">▾</span>
-      </div>
-      <div class="pkg-table-wrap" id="java-table">
-        <table id="java-pkg-table">
-          <thead><tr><th>Artefato Maven</th><th>Versão</th><th>JAR</th></tr></thead>
-          <tbody>
-            <tr><td>ch.qos.logback:logback-classic</td><td>1.5.34</td><td>logback-classic-1.5.34.jar</td></tr>
-            <tr><td>ch.qos.logback:logback-core</td><td>1.5.34</td><td>logback-core-1.5.34.jar</td></tr>
-            <tr><td>com.fasterxml.jackson.core:jackson-annotations</td><td>2.21</td><td>jackson-annotations-2.21.jar</td></tr>
-            <tr><td>com.fasterxml.jackson.core:jackson-core</td><td>2.21.4</td><td>jackson-core-2.21.4.jar</td></tr>
-            <tr style="background:rgba(34,197,94,.05); border-left:3px solid var(--low)">
-              <td style="color:var(--low)">com.fasterxml.jackson.core:jackson-databind ✔</td><td style="color:var(--low)">2.22.0</td><td>jackson-databind-2.22.0.jar</td>
-            </tr>
-            <tr><td>com.fasterxml.jackson.dataformat:jackson-dataformat-yaml</td><td>2.21.4</td><td>jackson-dataformat-yaml-2.21.4.jar</td></tr>
-            <tr><td>com.fasterxml.jackson.datatype:jackson-datatype-jsr310</td><td>2.21.4</td><td>jackson-datatype-jsr310-2.21.4.jar</td></tr>
-            <tr><td>com.fasterxml:classmate</td><td>1.7.3</td><td>classmate-1.7.3.jar</td></tr>
-            <tr><td>com.github.ben-manes.caffeine:caffeine</td><td>3.2.4</td><td>caffeine-3.2.4.jar</td></tr>
-            <tr><td>com.github.stephenc.jcip:jcip-annotations</td><td>1.0-1</td><td>nimbus-jose-jwt-10.9.jar</td></tr>
-            <tr><td>com.google.code.gson:gson</td><td>2.13.1</td><td>nimbus-jose-jwt-10.9.jar</td></tr>
-            <tr><td>com.google.errorprone:error_prone_annotations</td><td>2.49.0</td><td>error_prone_annotations-2.49.0.jar</td></tr>
-            <tr><td>com.nimbusds:nimbus-jose-jwt</td><td>10.9</td><td>nimbus-jose-jwt-10.9.jar</td></tr>
-            <tr><td>com.opencsv:opencsv</td><td>5.12.0</td><td>opencsv-5.12.0.jar</td></tr>
-            <tr><td>com.sun.istack:istack-commons-runtime</td><td>4.1.2</td><td>istack-commons-runtime-4.1.2.jar</td></tr>
-            <tr><td>com.zaxxer:HikariCP</td><td>7.0.2</td><td>HikariCP-7.0.2.jar</td></tr>
-            <tr><td>commons-io:commons-io</td><td>2.22.0</td><td>commons-io-2.22.0.jar</td></tr>
-            <tr><td>commons-logging:commons-logging</td><td>1.3.6</td><td>commons-logging-1.3.6.jar</td></tr>
-            <tr><td>io.lettuce:lettuce-core</td><td>7.5.2.RELEASE</td><td>lettuce-core-7.5.2.RELEASE.jar</td></tr>
-            <tr><td>io.micrometer:micrometer-commons</td><td>1.17.0</td><td>micrometer-commons-1.17.0.jar</td></tr>
-            <tr><td>io.micrometer:micrometer-core</td><td>1.17.0</td><td>micrometer-core-1.17.0.jar</td></tr>
-            <tr><td>io.micrometer:micrometer-jakarta9</td><td>1.17.0</td><td>micrometer-jakarta9-1.17.0.jar</td></tr>
-            <tr><td>io.micrometer:micrometer-observation</td><td>1.17.0</td><td>micrometer-observation-1.17.0.jar</td></tr>
-            <tr><td>io.netty:netty-buffer</td><td>4.2.15.Final</td><td>netty-buffer-4.2.15.Final.jar</td></tr>
-            <tr><td>io.netty:netty-codec-base</td><td>4.2.15.Final</td><td>netty-codec-base-4.2.15.Final.jar</td></tr>
-            <tr><td>io.netty:netty-codec-dns</td><td>4.2.15.Final</td><td>netty-codec-dns-4.2.15.Final.jar</td></tr>
-            <tr><td>io.netty:netty-common</td><td>4.2.15.Final</td><td>netty-common-4.2.15.Final.jar</td></tr>
-            <tr><td>io.netty:netty-handler</td><td>4.2.15.Final</td><td>netty-handler-4.2.15.Final.jar</td></tr>
-            <tr><td>io.netty:netty-resolver</td><td>4.2.15.Final</td><td>netty-resolver-4.2.15.Final.jar</td></tr>
-            <tr><td>io.netty:netty-resolver-dns</td><td>4.2.15.Final</td><td>netty-resolver-dns-4.2.15.Final.jar</td></tr>
-            <tr><td>io.netty:netty-transport</td><td>4.2.15.Final</td><td>netty-transport-4.2.15.Final.jar</td></tr>
-            <tr><td>io.netty:netty-transport-native-unix-common</td><td>4.2.15.Final</td><td>netty-transport-native-unix-common-4.2.15.Final.jar</td></tr>
-            <tr><td>io.projectreactor:reactor-core</td><td>3.8.6</td><td>reactor-core-3.8.6.jar</td></tr>
-            <tr><td>io.swagger.core.v3:swagger-annotations-jakarta</td><td>2.2.47</td><td>swagger-annotations-jakarta-2.2.47.jar</td></tr>
-            <tr><td>io.swagger.core.v3:swagger-core-jakarta</td><td>2.2.47</td><td>swagger-core-jakarta-2.2.47.jar</td></tr>
-            <tr><td>io.swagger.core.v3:swagger-models-jakarta</td><td>2.2.47</td><td>swagger-models-jakarta-2.2.47.jar</td></tr>
-            <tr><td>jakarta.activation:jakarta.activation-api</td><td>2.1.4</td><td>jakarta.activation-api-2.1.4.jar</td></tr>
-            <tr><td>jakarta.annotation:jakarta.annotation-api</td><td>3.0.0</td><td>jakarta.annotation-api-3.0.0.jar</td></tr>
-            <tr><td>jakarta.inject:jakarta.inject-api</td><td>2.0.1</td><td>jakarta.inject-api-2.0.1.jar</td></tr>
-            <tr><td>jakarta.mail:jakarta.mail-api</td><td>2.1.5</td><td>jakarta.mail-api-2.1.5.jar</td></tr>
-            <tr><td>jakarta.persistence:jakarta.persistence-api</td><td>3.2.0</td><td>jakarta.persistence-api-3.2.0.jar</td></tr>
-            <tr><td>jakarta.transaction:jakarta.transaction-api</td><td>2.0.1</td><td>jakarta.transaction-api-2.0.1.jar</td></tr>
-            <tr><td>jakarta.validation:jakarta.validation-api</td><td>3.1.1</td><td>jakarta.validation-api-3.1.1.jar</td></tr>
-            <tr><td>jakarta.xml.bind:jakarta.xml.bind-api</td><td>4.0.5</td><td>jakarta.xml.bind-api-4.0.5.jar</td></tr>
-            <tr><td>net.bytebuddy:byte-buddy</td><td>1.18.10</td><td>byte-buddy-1.18.10.jar</td></tr>
-            <tr><td>org.antlr:antlr4-runtime</td><td>4.13.2</td><td>antlr4-runtime-4.13.2.jar</td></tr>
-            <tr><td>org.apache.commons:commons-collections4</td><td>4.5.0</td><td>commons-collections4-4.5.0.jar</td></tr>
-            <tr><td>org.apache.commons:commons-lang3</td><td>3.20.0</td><td>commons-lang3-3.20.0.jar</td></tr>
-            <tr><td>org.apache.commons:commons-text</td><td>1.15.0</td><td>commons-text-1.15.0.jar</td></tr>
-            <tr><td>org.apache.logging.log4j:log4j-api</td><td>2.25.4</td><td>log4j-api-2.25.4.jar</td></tr>
-            <tr><td>org.apache.logging.log4j:log4j-to-slf4j</td><td>2.25.4</td><td>log4j-to-slf4j-2.25.4.jar</td></tr>
-            <tr><td>org.apache.tomcat.embed:tomcat-embed-core</td><td>11.0.22</td><td>tomcat-embed-core-11.0.22.jar</td></tr>
-            <tr><td>org.apache.tomcat.embed:tomcat-embed-el</td><td>11.0.22</td><td>tomcat-embed-el-11.0.22.jar</td></tr>
-            <tr><td>org.apache.tomcat.embed:tomcat-embed-websocket</td><td>11.0.22</td><td>tomcat-embed-websocket-11.0.22.jar</td></tr>
-            <tr><td>org.aspectj:aspectjweaver</td><td>1.9.25.1</td><td>aspectjweaver-1.9.25.1.jar</td></tr>
-            <tr><td>org.eclipse.angus:angus-activation</td><td>2.0.3</td><td>angus-activation-2.0.3.jar</td></tr>
-            <tr><td>org.eclipse.angus:angus-core</td><td>2.0.5</td><td>angus-mail-2.0.5.jar</td></tr>
-            <tr><td>org.eclipse.angus:angus-mail</td><td>2.0.5</td><td>angus-mail-2.0.5.jar</td></tr>
-            <tr><td>org.eclipse.angus:imap</td><td>2.0.5</td><td>angus-mail-2.0.5.jar</td></tr>
-            <tr><td>org.eclipse.angus:logging-mailhandler</td><td>2.0.5</td><td>angus-mail-2.0.5.jar</td></tr>
-            <tr><td>org.eclipse.angus:pop3</td><td>2.0.5</td><td>angus-mail-2.0.5.jar</td></tr>
-            <tr><td>org.eclipse.angus:smtp</td><td>2.0.5</td><td>angus-mail-2.0.5.jar</td></tr>
-            <tr><td>org.glassfish.jaxb:jaxb-core</td><td>4.0.9</td><td>jaxb-core-4.0.9.jar</td></tr>
-            <tr><td>org.glassfish.jaxb:jaxb-runtime</td><td>4.0.9</td><td>jaxb-runtime-4.0.9.jar</td></tr>
-            <tr><td>org.glassfish.jaxb:txw2</td><td>4.0.9</td><td>txw2-4.0.9.jar</td></tr>
-            <tr><td>org.hdrhistogram:HdrHistogram</td><td>2.2.2</td><td>HdrHistogram-2.2.2.jar</td></tr>
-            <tr><td>org.hibernate.models:hibernate-models</td><td>1.1.0</td><td>hibernate-models-1.1.1.jar</td></tr>
-            <tr><td>org.hibernate.validator:hibernate-validator</td><td>9.1.0.Final</td><td>hibernate-validator-9.1.0.Final.jar</td></tr>
-            <tr><td>org.hibernate:hibernate-core</td><td>7.4.1.Final</td><td>hibernate-core-7.4.1.Final.jar</td></tr>
-            <tr><td>org.jboss.logging:jboss-logging</td><td>3.6.3.Final</td><td>jboss-logging-3.6.3.Final.jar</td></tr>
-            <tr><td>org.jctools:jctools-core</td><td>4.0.6</td><td>netty-common-4.2.15.Final.jar</td></tr>
-            <tr><td>org.jspecify:jspecify</td><td>1.0.0</td><td>jspecify-1.0.0.jar</td></tr>
-            <tr><td>org.liquibase:liquibase-core</td><td>5.0.3</td><td>liquibase-core-5.0.3.jar</td></tr>
-            <tr><td>org.mapstruct:mapstruct</td><td>1.6.3</td><td>mapstruct-1.6.3.jar</td></tr>
-            <tr><td>org.postgresql:postgresql</td><td>42.7.11</td><td>postgresql-42.7.11.jar</td></tr>
-            <tr><td>org.reactivestreams:reactive-streams</td><td>1.0.4</td><td>reactive-streams-1.0.4.jar</td></tr>
-            <tr><td>org.slf4j:jul-to-slf4j</td><td>2.0.18</td><td>jul-to-slf4j-2.0.18.jar</td></tr>
-            <tr><td>org.slf4j:slf4j-api</td><td>2.0.18</td><td>slf4j-api-2.0.18.jar</td></tr>
-            <tr><td>org.springdoc:springdoc-openapi-starter-common</td><td>3.0.3</td><td>springdoc-openapi-starter-common-3.0.3.jar</td></tr>
-            <tr><td>org.springdoc:springdoc-openapi-starter-webmvc-api</td><td>3.0.3</td><td>springdoc-openapi-starter-webmvc-api-3.0.3.jar</td></tr>
-            <tr><td>org.springdoc:springdoc-openapi-starter-webmvc-ui</td><td>3.0.3</td><td>springdoc-openapi-starter-webmvc-ui-3.0.3.jar</td></tr>
-            <tr><td>org.springframework.boot:spring-boot</td><td>4.1.0</td><td>spring-boot-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.boot:spring-boot-actuator</td><td>4.1.0</td><td>spring-boot-actuator-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.boot:spring-boot-actuator-autoconfigure</td><td>4.1.0</td><td>spring-boot-actuator-autoconfigure-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.boot:spring-boot-autoconfigure</td><td>4.1.0</td><td>spring-boot-autoconfigure-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.boot:spring-boot-data-commons</td><td>4.1.0</td><td>spring-boot-data-commons-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.boot:spring-boot-data-jpa</td><td>4.1.0</td><td>spring-boot-data-jpa-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.boot:spring-boot-data-redis</td><td>4.1.0</td><td>spring-boot-data-redis-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.boot:spring-boot-health</td><td>4.1.0</td><td>spring-boot-health-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.boot:spring-boot-hibernate</td><td>4.1.0</td><td>spring-boot-hibernate-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.boot:spring-boot-http-converter</td><td>4.1.0</td><td>spring-boot-http-converter-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.boot:spring-boot-jackson</td><td>4.1.0</td><td>spring-boot-jackson-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.boot:spring-boot-jarmode-tools</td><td>4.1.0</td><td>spring-boot-jarmode-tools-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.boot:spring-boot-jdbc</td><td>4.1.0</td><td>spring-boot-jdbc-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.boot:spring-boot-jpa</td><td>4.1.0</td><td>spring-boot-jpa-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.boot:spring-boot-liquibase</td><td>4.1.0</td><td>spring-boot-liquibase-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.boot:spring-boot-mail</td><td>4.1.0</td><td>spring-boot-mail-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.boot:spring-boot-micrometer-metrics</td><td>4.1.0</td><td>spring-boot-micrometer-metrics-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.boot:spring-boot-micrometer-observation</td><td>4.1.0</td><td>spring-boot-micrometer-observation-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.boot:spring-boot-netty</td><td>4.1.0</td><td>spring-boot-netty-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.boot:spring-boot-persistence</td><td>4.1.0</td><td>spring-boot-persistence-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.boot:spring-boot-security</td><td>4.1.0</td><td>spring-boot-security-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.boot:spring-boot-security-oauth2-resource-server</td><td>4.1.0</td><td>spring-boot-security-oauth2-resource-server-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.boot:spring-boot-servlet</td><td>4.1.0</td><td>spring-boot-servlet-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.boot:spring-boot-sql</td><td>4.1.0</td><td>spring-boot-sql-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.boot:spring-boot-tomcat</td><td>4.1.0</td><td>spring-boot-tomcat-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.boot:spring-boot-transaction</td><td>4.1.0</td><td>spring-boot-transaction-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.boot:spring-boot-validation</td><td>4.1.0</td><td>spring-boot-validation-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.boot:spring-boot-web-server</td><td>4.1.0</td><td>spring-boot-web-server-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.boot:spring-boot-webmvc</td><td>4.1.0</td><td>spring-boot-webmvc-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.data:spring-data-commons</td><td>4.1.0</td><td>spring-data-commons-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.data:spring-data-jpa</td><td>4.1.0</td><td>spring-data-jpa-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.data:spring-data-keyvalue</td><td>4.1.0</td><td>spring-data-keyvalue-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.data:spring-data-redis</td><td>4.1.0</td><td>spring-data-redis-4.1.0.jar</td></tr>
-            <tr><td>org.springframework.security:spring-security-config</td><td>7.1.0</td><td>spring-security-config-7.1.0.jar</td></tr>
-            <tr><td>org.springframework.security:spring-security-core</td><td>7.1.0</td><td>spring-security-core-7.1.0.jar</td></tr>
-            <tr><td>org.springframework.security:spring-security-crypto</td><td>7.1.0</td><td>spring-security-crypto-7.1.0.jar</td></tr>
-            <tr><td>org.springframework.security:spring-security-oauth2-core</td><td>7.1.0</td><td>spring-security-oauth2-core-7.1.0.jar</td></tr>
-            <tr><td>org.springframework.security:spring-security-oauth2-jose</td><td>7.1.0</td><td>spring-security-oauth2-jose-7.1.0.jar</td></tr>
-            <tr><td>org.springframework.security:spring-security-oauth2-resource-server</td><td>7.1.0</td><td>spring-security-oauth2-resource-server-7.1.0.jar</td></tr>
-            <tr><td>org.springframework.security:spring-security-web</td><td>7.1.0</td><td>spring-security-web-7.1.0.jar</td></tr>
-            <tr><td>org.springframework:spring-aop</td><td>7.0.8</td><td>spring-aop-7.0.8.jar</td></tr>
-            <tr><td>org.springframework:spring-aspects</td><td>7.0.8</td><td>spring-aspects-7.0.8.jar</td></tr>
-            <tr><td>org.springframework:spring-beans</td><td>7.0.8</td><td>spring-beans-7.0.8.jar</td></tr>
-            <tr><td>org.springframework:spring-context</td><td>7.0.8</td><td>spring-context-7.0.8.jar</td></tr>
-            <tr><td>org.springframework:spring-context-support</td><td>7.0.8</td><td>spring-context-support-7.0.8.jar</td></tr>
-            <tr><td>org.springframework:spring-core</td><td>7.0.8</td><td>spring-core-7.0.8.jar</td></tr>
-            <tr><td>org.springframework:spring-expression</td><td>7.0.8</td><td>spring-expression-7.0.8.jar</td></tr>
-            <tr><td>org.springframework:spring-jdbc</td><td>7.0.8</td><td>spring-jdbc-7.0.8.jar</td></tr>
-            <tr><td>org.springframework:spring-messaging</td><td>7.0.8</td><td>spring-messaging-7.0.8.jar</td></tr>
-            <tr><td>org.springframework:spring-orm</td><td>7.0.8</td><td>spring-orm-7.0.8.jar</td></tr>
-            <tr><td>org.springframework:spring-oxm</td><td>7.0.8</td><td>spring-oxm-7.0.8.jar</td></tr>
-            <tr><td>org.springframework:spring-tx</td><td>7.0.8</td><td>spring-tx-7.0.8.jar</td></tr>
-            <tr><td>org.springframework:spring-web</td><td>7.0.8</td><td>spring-web-7.0.8.jar</td></tr>
-            <tr><td>org.springframework:spring-webmvc</td><td>7.0.8</td><td>spring-webmvc-7.0.8.jar</td></tr>
-            <tr><td>org.webjars:swagger-ui</td><td>5.32.2</td><td>swagger-ui-5.32.2.jar</td></tr>
-            <tr><td>org.webjars:webjars-locator-lite</td><td>1.1.3</td><td>webjars-locator-lite-1.1.3.jar</td></tr>
-            <tr><td>org.yaml:snakeyaml</td><td>2.6</td><td>snakeyaml-2.6.jar</td></tr>
-            <tr><td>redis.clients.authentication:redis-authx-core</td><td>0.1.1-beta2</td><td>redis-authx-core-0.1.1-beta2.jar</td></tr>
-            <tr><td>tools.jackson.core:jackson-core</td><td>3.1.4</td><td>jackson-core-3.1.4.jar</td></tr>
-            <tr><td>tools.jackson.core:jackson-databind</td><td>3.1.4</td><td>jackson-databind-3.1.4.jar</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <footer>
-    <p>Gerado por <strong>Trivy v0.71.2</strong> · ReportID: <code>019f1152-0181-798f-953b-495985827cca</code></p>
-    <p style="margin-top:4px">Imagem: <code>tech-challenge-1_core:latest</code> · Alpine 3.23.5 · OpenJDK 25.0.3+9</p>
-  </footer>
+  <footer>Relatório baseado em <code>security-report.json</code> (SchemaVersion 2).</footer>
 </div>
-
 <script>
-  function toggleTarget(header) {
-    header.classList.toggle('open');
-    header.nextElementSibling.classList.toggle('open');
-  }
-
-  function filterPackages() {
-    const q = document.getElementById('pkgSearch').value.toLowerCase();
-    ['alpine-pkg-table', 'java-pkg-table'].forEach(id => {
-      document.querySelectorAll(`#${id} tbody tr`).forEach(row => {
-        row.style.display = (!q || row.textContent.toLowerCase().includes(q)) ? '' : 'none';
-      });
+function wireFilter(inputId, tableId) {
+  var input = document.getElementById(inputId);
+  var rows = document.querySelectorAll('#' + tableId + ' tbody tr');
+  input.addEventListener('input', function() {
+    var q = input.value.toLowerCase();
+    rows.forEach(function(row) {
+      row.hidden = q.length > 0 && row.textContent.toLowerCase().indexOf(q) === -1;
     });
-  }
+  });
+}
+wireFilter('search-os', 'table-os');
+wireFilter('search-lang', 'table-lang');
 </script>
 </body>
 </html>

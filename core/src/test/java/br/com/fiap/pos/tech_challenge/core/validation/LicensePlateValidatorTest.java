@@ -22,8 +22,6 @@ class LicensePlateValidatorTest {
         ctx = mock(ConstraintValidatorContext.class);
     }
 
-    // ---- formato antigo (AAA9999) ----
-
     @Test
     void isValid_returnsTrueForOldFormat() {
         assertThat(sut.isValid("ABC1234", ctx)).isTrue();
@@ -34,8 +32,6 @@ class LicensePlateValidatorTest {
         assertThat(sut.isValid("abc1234", ctx)).isTrue();
     }
 
-    // ---- formato Mercosul (AAA9A99) ----
-
     @Test
     void isValid_returnsTrueForMercosulFormat() {
         assertThat(sut.isValid("ABC1D23", ctx)).isTrue();
@@ -45,8 +41,6 @@ class LicensePlateValidatorTest {
     void isValid_returnsTrueForMercosulFormatLowercase() {
         assertThat(sut.isValid("abc1d23", ctx)).isTrue();
     }
-
-    // ---- inválidos ----
 
     @Test
     void isValid_returnsFalseForNull() {

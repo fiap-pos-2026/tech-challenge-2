@@ -1,34 +1,38 @@
 package br.com.fiap.pos.tech_challenge.core.integration;
 
-import br.com.fiap.pos.tech_challenge.core.controller.dto.OpenProductItemRequest;
-import br.com.fiap.pos.tech_challenge.core.controller.dto.ServiceOrderResponse;
-import br.com.fiap.pos.tech_challenge.core.domain.Customer;
-import br.com.fiap.pos.tech_challenge.core.domain.MechanicalService;
-import br.com.fiap.pos.tech_challenge.core.domain.Product;
-import br.com.fiap.pos.tech_challenge.core.domain.ServiceOrder;
-import br.com.fiap.pos.tech_challenge.core.domain.Vehicle;
-import br.com.fiap.pos.tech_challenge.core.enums.DocumentType;
-import br.com.fiap.pos.tech_challenge.core.enums.MeasurementUnit;
-import br.com.fiap.pos.tech_challenge.core.enums.ProductType;
-import br.com.fiap.pos.tech_challenge.core.enums.ServiceOrderStatus;
-import br.com.fiap.pos.tech_challenge.core.exception.CustomerNotFoundException;
-import br.com.fiap.pos.tech_challenge.core.exception.ProductNotFoundException;
-import br.com.fiap.pos.tech_challenge.core.exception.VehicleNotFoundException;
-import br.com.fiap.pos.tech_challenge.core.repository.CustomerRepository;
-import br.com.fiap.pos.tech_challenge.core.repository.MechanicalServiceRepository;
-import br.com.fiap.pos.tech_challenge.core.repository.ProductRepository;
-import br.com.fiap.pos.tech_challenge.core.repository.QuoteRepository;
-import br.com.fiap.pos.tech_challenge.core.repository.ServiceOrderRepository;
-import br.com.fiap.pos.tech_challenge.core.repository.VehicleRepository;
-import br.com.fiap.pos.tech_challenge.core.service.OTPService;
-import br.com.fiap.pos.tech_challenge.core.service.ServiceOrderService;
+import br.com.fiap.pos.tech_challenge.core.application.dto.OpenProductItemRequest;
+import br.com.fiap.pos.tech_challenge.core.application.dto.ServiceOrderResponse;
+import br.com.fiap.pos.tech_challenge.core.domain.model.Customer;
+import br.com.fiap.pos.tech_challenge.core.domain.model.MechanicalService;
+import br.com.fiap.pos.tech_challenge.core.domain.model.Product;
+import br.com.fiap.pos.tech_challenge.core.domain.model.ServiceOrder;
+import br.com.fiap.pos.tech_challenge.core.domain.model.Vehicle;
+import br.com.fiap.pos.tech_challenge.core.domain.enums.DocumentType;
+import br.com.fiap.pos.tech_challenge.core.domain.enums.MeasurementUnit;
+import br.com.fiap.pos.tech_challenge.core.domain.enums.ProductType;
+import br.com.fiap.pos.tech_challenge.core.domain.enums.ServiceOrderStatus;
+import br.com.fiap.pos.tech_challenge.core.domain.exception.CustomerNotFoundException;
+import br.com.fiap.pos.tech_challenge.core.domain.exception.ProductNotFoundException;
+import br.com.fiap.pos.tech_challenge.core.domain.exception.VehicleNotFoundException;
+import br.com.fiap.pos.tech_challenge.core.application.port.out.CustomerRepository;
+import br.com.fiap.pos.tech_challenge.core.application.port.out.MechanicalServiceRepository;
+import br.com.fiap.pos.tech_challenge.core.application.port.out.ProductRepository;
+import br.com.fiap.pos.tech_challenge.core.application.port.out.QuoteRepository;
+import br.com.fiap.pos.tech_challenge.core.application.port.out.ServiceOrderRepository;
+import br.com.fiap.pos.tech_challenge.core.application.port.out.VehicleRepository;
+import br.com.fiap.pos.tech_challenge.core.application.OTPService;
+import br.com.fiap.pos.tech_challenge.core.application.serviceorder.QuoteApprovalService;
+import br.com.fiap.pos.tech_challenge.core.application.serviceorder.ServiceOrderDiagnosisService;
+import br.com.fiap.pos.tech_challenge.core.application.serviceorder.ServiceOrderExecutionService;
+import br.com.fiap.pos.tech_challenge.core.application.serviceorder.ServiceOrderOpeningService;
+import br.com.fiap.pos.tech_challenge.core.application.serviceorder.ServiceOrderQueryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.http.HttpStatus;
+import br.com.fiap.pos.tech_challenge.core.domain.exception.ErrorStatus;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,7 +53,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Transactional
 class ServiceOrderIntegrationTest extends BaseIntegrationTest {
 
-    @Autowired ServiceOrderService serviceOrderService;
+    @Autowired ServiceOrderOpeningService openingService;
+    @Autowired ServiceOrderDiagnosisService diagnosisService;
+    @Autowired QuoteApprovalService approvalService;
+    @Autowired ServiceOrderExecutionService executionService;
+    @Autowired ServiceOrderQueryService queryService;
     @Autowired ServiceOrderRepository serviceOrderRepository;
     @Autowired QuoteRepository quoteRepository;
     @Autowired CustomerRepository customerRepository;
@@ -115,7 +123,7 @@ class ServiceOrderIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void openServiceOrder_persistsWithStatusReceived() {
-        var response = serviceOrderService.openServiceOrder(
+        var response = openingService.openServiceOrder(
                 customer.getUuid(), vehicle.getUuid(), "Barulho no motor");
 
         assertThat(response).isNotNull();
@@ -128,7 +136,7 @@ class ServiceOrderIntegrationTest extends BaseIntegrationTest {
         MechanicalService service = mechanicalServiceRepository.save(newMechanicalService());
         Product product = productRepository.save(newProduct());
 
-        var response = serviceOrderService.openServiceOrder(
+        var response = openingService.openServiceOrder(
                 customer.getUuid(), vehicle.getUuid(), "Revisão completa",
                 List.of(service.getUuid()),
                 List.of(new OpenProductItemRequest(product.getUuid(), new BigDecimal("2"))));
@@ -144,44 +152,44 @@ class ServiceOrderIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void openServiceOrder_withUnknownProduct_returnsNotFoundAndLeavesNoOrphanOrder() {
-        assertThatThrownBy(() -> serviceOrderService.openServiceOrder(
+        assertThatThrownBy(() -> openingService.openServiceOrder(
                 customer.getUuid(), vehicle.getUuid(), "Revisão completa", null,
                 List.of(new OpenProductItemRequest(UUID.randomUUID(), BigDecimal.ONE))))
                 .isInstanceOf(ProductNotFoundException.class)
                 .extracting(e -> ((ProductNotFoundException) e).getStatus())
-                .isEqualTo(HttpStatus.NOT_FOUND);
+                .isEqualTo(ErrorStatus.NOT_FOUND);
 
         assertThat(serviceOrderRepository.count()).isZero();
     }
 
     @Test
     void openServiceOrder_withUnknownCustomer_returnsNotFoundAndLeavesNoOrphanOrder() {
-        assertThatThrownBy(() -> serviceOrderService.openServiceOrder(
+        assertThatThrownBy(() -> openingService.openServiceOrder(
                 UUID.randomUUID(), vehicle.getUuid(), "Barulho no motor"))
                 .isInstanceOf(CustomerNotFoundException.class)
                 .extracting(e -> ((CustomerNotFoundException) e).getStatus())
-                .isEqualTo(HttpStatus.NOT_FOUND);
+                .isEqualTo(ErrorStatus.NOT_FOUND);
 
         assertThat(serviceOrderRepository.count()).isZero();
     }
 
     @Test
     void openServiceOrder_withUnknownVehicle_returnsNotFoundAndLeavesNoOrphanOrder() {
-        assertThatThrownBy(() -> serviceOrderService.openServiceOrder(
+        assertThatThrownBy(() -> openingService.openServiceOrder(
                 customer.getUuid(), UUID.randomUUID(), "Barulho no motor"))
                 .isInstanceOf(VehicleNotFoundException.class)
                 .extracting(e -> ((VehicleNotFoundException) e).getStatus())
-                .isEqualTo(HttpStatus.NOT_FOUND);
+                .isEqualTo(ErrorStatus.NOT_FOUND);
 
         assertThat(serviceOrderRepository.count()).isZero();
     }
 
     @Test
     void getServiceOrderStatus_returnsPersistedStatusForPublicQuery() {
-        var created = serviceOrderService.openServiceOrder(
+        var created = openingService.openServiceOrder(
                 customer.getUuid(), vehicle.getUuid(), "Consulta pública");
 
-        var status = serviceOrderService.getServiceOrderStatus(created.uuid());
+        var status = queryService.getServiceOrderStatus(created.uuid());
 
         assertThat(status.uuid()).isEqualTo(created.uuid());
         assertThat(status.status()).isEqualTo(ServiceOrderStatus.RECEIVED);
@@ -189,12 +197,12 @@ class ServiceOrderIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void approveQuote_transitionsAwaitingApprovalToInProgress() {
-        var created = serviceOrderService.openServiceOrder(
+        var created = openingService.openServiceOrder(
                 customer.getUuid(), vehicle.getUuid(), "Aprovação de orçamento");
-        serviceOrderService.startDiagnosis(created.uuid());
-        serviceOrderService.completeDiagnosis(created.uuid());
+        diagnosisService.startDiagnosis(created.uuid());
+        diagnosisService.completeDiagnosis(created.uuid());
 
-        var approved = serviceOrderService.approveQuote(created.uuid(), customer.getDocument(), "123456");
+        var approved = approvalService.approveQuote(created.uuid(), customer.getDocument(), "123456");
 
         assertThat(approved.status()).isEqualTo(ServiceOrderStatus.IN_PROGRESS);
         ServiceOrder persisted = serviceOrderRepository.findByUuid(created.uuid()).orElseThrow();
@@ -203,10 +211,10 @@ class ServiceOrderIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void startDiagnosis_transitionsStatusInDatabase() {
-        var created = serviceOrderService.openServiceOrder(
+        var created = openingService.openServiceOrder(
                 customer.getUuid(), vehicle.getUuid(), "Freio falhando");
 
-        var inDiagnosis = serviceOrderService.startDiagnosis(created.uuid());
+        var inDiagnosis = diagnosisService.startDiagnosis(created.uuid());
 
         assertThat(inDiagnosis.status()).isEqualTo(ServiceOrderStatus.IN_DIAGNOSIS);
 
@@ -216,11 +224,11 @@ class ServiceOrderIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void completeDiagnosis_advancesToAwaitingApproval() {
-        var created = serviceOrderService.openServiceOrder(
+        var created = openingService.openServiceOrder(
                 customer.getUuid(), vehicle.getUuid(), "Troca de óleo");
 
-        serviceOrderService.startDiagnosis(created.uuid());
-        serviceOrderService.completeDiagnosis(created.uuid());
+        diagnosisService.startDiagnosis(created.uuid());
+        diagnosisService.completeDiagnosis(created.uuid());
 
         ServiceOrder persisted = serviceOrderRepository.findByUuid(created.uuid()).orElseThrow();
         assertThat(persisted.getStatus()).isEqualTo(ServiceOrderStatus.AWAITING_APPROVAL);
@@ -228,11 +236,11 @@ class ServiceOrderIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void completeDiagnosis_setsCalculatedTotalAmount() {
-        var created = serviceOrderService.openServiceOrder(
+        var created = openingService.openServiceOrder(
                 customer.getUuid(), vehicle.getUuid(), "Verificação geral");
 
-        serviceOrderService.startDiagnosis(created.uuid());
-        serviceOrderService.completeDiagnosis(created.uuid());
+        diagnosisService.startDiagnosis(created.uuid());
+        diagnosisService.completeDiagnosis(created.uuid());
 
         ServiceOrder persisted = serviceOrderRepository.findByUuid(created.uuid()).orElseThrow();
         var quote = quoteRepository.findFirstByServiceOrderIdOrderByCreatedAtDesc(persisted.getId());
@@ -243,27 +251,26 @@ class ServiceOrderIntegrationTest extends BaseIntegrationTest {
     @Test
     @Timeout(5)
     void completeDiagnosis_finishesInUnder5Seconds() {
-        var created = serviceOrderService.openServiceOrder(
+        var created = openingService.openServiceOrder(
                 customer.getUuid(), vehicle.getUuid(), "Diagnóstico performance");
 
-        serviceOrderService.startDiagnosis(created.uuid());
-        serviceOrderService.completeDiagnosis(created.uuid());
+        diagnosisService.startDiagnosis(created.uuid());
+        diagnosisService.completeDiagnosis(created.uuid());
     }
 
     @Test
     void completeExecution_transitionsInProgressToCompleted() {
-        var created = serviceOrderService.openServiceOrder(
+        var created = openingService.openServiceOrder(
                 customer.getUuid(), vehicle.getUuid(), "Reparação motor");
 
-        serviceOrderService.startDiagnosis(created.uuid());
-        serviceOrderService.completeDiagnosis(created.uuid()); // → AWAITING_APPROVAL
+        diagnosisService.startDiagnosis(created.uuid());
+        diagnosisService.completeDiagnosis(created.uuid()); // → AWAITING_APPROVAL
 
-        // advance to IN_PROGRESS directly (simulates quote approval)
         ServiceOrder persisted = serviceOrderRepository.findByUuid(created.uuid()).orElseThrow();
         persisted.setStatus(ServiceOrderStatus.IN_PROGRESS);
         serviceOrderRepository.save(persisted);
 
-        var result = serviceOrderService.completeExecution(created.uuid());
+        var result = executionService.completeExecution(created.uuid());
 
         assertThat(result.status()).isEqualTo(ServiceOrderStatus.COMPLETED);
         ServiceOrder finalSo = serviceOrderRepository.findByUuid(created.uuid()).orElseThrow();
@@ -282,7 +289,7 @@ class ServiceOrderIntegrationTest extends BaseIntegrationTest {
         ServiceOrder completed = persistOrder(ServiceOrderStatus.COMPLETED, base.plusDays(6));
         ServiceOrder delivered = persistOrder(ServiceOrderStatus.DELIVERED, base.plusDays(7));
 
-        var page = serviceOrderService.listServiceOrders(
+        var page = queryService.listServiceOrders(
                 null, null, null, null, PageRequest.of(0, 20));
 
         assertThat(page.getContent()).extracting(ServiceOrderResponse::uuid)
@@ -299,7 +306,7 @@ class ServiceOrderIntegrationTest extends BaseIntegrationTest {
         ServiceOrder receivedNewer = persistOrder(ServiceOrderStatus.RECEIVED, base.plusDays(1));
         ServiceOrder inProgress = persistOrder(ServiceOrderStatus.IN_PROGRESS, base.plusDays(2));
 
-        var page = serviceOrderService.listServiceOrders(null, null, null, null,
+        var page = queryService.listServiceOrders(null, null, null, null,
                 PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt")));
 
         assertThat(page.getContent()).extracting(ServiceOrderResponse::uuid)
@@ -314,7 +321,7 @@ class ServiceOrderIntegrationTest extends BaseIntegrationTest {
         persistOrder(ServiceOrderStatus.DELIVERED, base.plusDays(2));
         persistOrder(ServiceOrderStatus.IN_PROGRESS, base.plusDays(3));
 
-        var page = serviceOrderService.listServiceOrders(
+        var page = queryService.listServiceOrders(
                 ServiceOrderStatus.COMPLETED, null, null, null, PageRequest.of(0, 20));
 
         assertThat(page.getContent()).extracting(ServiceOrderResponse::uuid)

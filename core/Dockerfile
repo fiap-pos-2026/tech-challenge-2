@@ -19,9 +19,9 @@ ARG PROJECT
 
 ARG DEPENDENCY=/workspace/app/${PROJECT}/build/dependency
 
-RUN addgroup -S -g 10001 nonroot \
-    && adduser -S -D -H -u 10001 -G nonroot nonroot \
-    && apk upgrade --no-cache p11-kit p11-kit-trust
+RUN apk upgrade --no-cache \
+    && addgroup -S -g 10001 nonroot \
+    && adduser -S -D -H -u 10001 -G nonroot nonroot
 
 COPY --from=build ${DEPENDENCY}/BOOT-INF/lib /app/lib
 

@@ -20,12 +20,10 @@ public class MaskedDocumentSerializer extends JsonSerializer<String> {
         }
         String digits = value.replaceAll("\\D", "");
         if (digits.length() == 11) {
-            // CPF: ***.456.789-**
             gen.writeString(String.format("***.%s.%s-**",
                     digits.substring(3, 6),
                     digits.substring(6, 9)));
         } else if (digits.length() == 14) {
-            // CNPJ: **.345.678/0001-**
             gen.writeString(String.format("**.%s.%s/%s-**",
                     digits.substring(2, 5),
                     digits.substring(5, 8),

@@ -1,17 +1,17 @@
 package br.com.fiap.pos.tech_challenge.core.integration;
 
-import br.com.fiap.pos.tech_challenge.core.domain.Product;
-import br.com.fiap.pos.tech_challenge.core.domain.StockMovement;
-import br.com.fiap.pos.tech_challenge.core.domain.User;
-import br.com.fiap.pos.tech_challenge.core.enums.MeasurementUnit;
-import br.com.fiap.pos.tech_challenge.core.enums.MovementType;
-import br.com.fiap.pos.tech_challenge.core.enums.ProductType;
-import br.com.fiap.pos.tech_challenge.core.enums.UserRole;
-import br.com.fiap.pos.tech_challenge.core.exception.InsufficientStockException;
-import br.com.fiap.pos.tech_challenge.core.repository.ProductRepository;
-import br.com.fiap.pos.tech_challenge.core.repository.StockMovementRepository;
-import br.com.fiap.pos.tech_challenge.core.repository.UserRepository;
-import br.com.fiap.pos.tech_challenge.core.service.StockService;
+import br.com.fiap.pos.tech_challenge.core.domain.model.Product;
+import br.com.fiap.pos.tech_challenge.core.domain.model.StockMovement;
+import br.com.fiap.pos.tech_challenge.core.domain.model.User;
+import br.com.fiap.pos.tech_challenge.core.domain.enums.MeasurementUnit;
+import br.com.fiap.pos.tech_challenge.core.domain.enums.MovementType;
+import br.com.fiap.pos.tech_challenge.core.domain.enums.ProductType;
+import br.com.fiap.pos.tech_challenge.core.domain.enums.UserRole;
+import br.com.fiap.pos.tech_challenge.core.domain.exception.InsufficientStockException;
+import br.com.fiap.pos.tech_challenge.core.application.port.out.ProductRepository;
+import br.com.fiap.pos.tech_challenge.core.application.port.out.StockMovementRepository;
+import br.com.fiap.pos.tech_challenge.core.application.port.out.UserRepository;
+import br.com.fiap.pos.tech_challenge.core.application.StockService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -137,7 +137,6 @@ class InventoryIntegrationTest extends BaseIntegrationTest {
     void compensation_increasesQuantityAndCreatesCompensationMovement_withoutCheckingReturnable() {
         BigDecimal quantity = new BigDecimal("2.0000");
 
-        // nonReturnableProduct.returnable == false, but compensate() must NOT check returnable
         stockService.compensate(nonReturnableProduct.getUuid(), quantity, null, operator);
 
         Product updated = productRepository.findByUuid(nonReturnableProduct.getUuid()).orElseThrow();
@@ -149,7 +148,7 @@ class InventoryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void stockMovement_isImmutable_updatesAreIgnoredByJpa() {
+    void stockMovement_isImmutable_updatesAreIgnoredByPersistence() {
         stockService.debit(product.getUuid(), new BigDecimal("1.0000"), null, operator);
 
         StockMovement movement = stockMovementRepository
@@ -159,12 +158,11 @@ class InventoryIntegrationTest extends BaseIntegrationTest {
         BigDecimal originalQuantity = movement.getQuantity();
         MovementType originalType = movement.getType();
 
-        // Attempt to mutate and persist — JPA must ignore updatable=false columns
+        // columns are updatable=false — the mutation must not reach the database
         movement.setQuantity(new BigDecimal("999.0000"));
         movement.setType(MovementType.CREDIT);
-        stockMovementRepository.saveAndFlush(movement);
+        stockMovementRepository.save(movement);
 
-        // Clear L1 cache so the next load hits the database, not the in-memory entity
         entityManager.clear();
 
         StockMovement reloaded = stockMovementRepository.findById(movement.getId()).orElseThrow();

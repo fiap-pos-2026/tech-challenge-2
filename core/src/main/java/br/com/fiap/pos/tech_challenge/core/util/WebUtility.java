@@ -1,7 +1,7 @@
 package br.com.fiap.pos.tech_challenge.core.util;
 
-import br.com.fiap.pos.tech_challenge.core.enums.EApplicationError;
-import br.com.fiap.pos.tech_challenge.core.exception.ErrorResponse;
+import br.com.fiap.pos.tech_challenge.core.domain.enums.EApplicationError;
+import br.com.fiap.pos.tech_challenge.core.web.exception.ErrorResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.experimental.UtilityClass;
@@ -22,7 +22,7 @@ public class WebUtility {
     }
 
     public static void writeError(HttpServletResponse response, EApplicationError handledError, String message) throws IOException {
-        response.setStatus(handledError.getStatus().value());
+        response.setStatus(handledError.getStatus().code());
         response.setContentType("application/json;charset=UTF-8");
 
         ErrorResponse errorResponse = new ErrorResponse(message, handledError.getErrorCode());

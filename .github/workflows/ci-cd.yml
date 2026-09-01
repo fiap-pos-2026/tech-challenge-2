@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - feature/tech-challenge-2
   pull_request:
     branches:
       - main
@@ -92,9 +91,11 @@ jobs:
           docker push ${{ env.IMAGE_NAME }}:${{ github.sha }}
           docker push ${{ env.IMAGE_NAME }}:latest
 
-  # Provisiona/atualiza o cluster microk8s (cluster.tf instala se ausente, sobe se parado,
-  # garante os addons) e namespace, PostgreSQL, Redis e Mailpit via Terraform. Idempotente:
-  # se o cluster já existe, só reconcilia os recursos.
+  # Provisiona/atualiza o cluster microk8s e, em seguida, namespace + PostgreSQL/Redis/Mailpit.
+  # Dois configs Terraform: infra/cluster/ (bootstrap, sem provider kubernetes — instala/sobe o
+  # microk8s e escreve o kubeconfig) roda ANTES de infra/ (recursos, provider kubernetes). O
+  # split existe porque o provider kubernetes faz refresh no início do apply e falharia num
+  # host sem cluster, antes de o bootstrap rodar. Ambos idempotentes.
   terraform-apply:
     name: Terraform Apply (infra)
     needs: docker-image
@@ -115,18 +116,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Terraform Init
+      - name: Terraform Init (cluster bootstrap)
+        working-directory: infra/cluster
         run: |
-          # State local fora do checkout (o backend "kubernetes" não serve: o init roda antes
-          # de o cluster existir). Sobrevive entre runs no runner self-hosted persistente.
+          # State local fora do checkout, separado do state de recursos. Sobrevive entre runs
+          # no runner self-hosted persistente.
+          state_path="$HOME/.local/state/tech-challenge/cluster.tfstate"
+          mkdir -p "$(dirname "$state_path")"
+          terraform init -input=false -backend-config="path=$state_path"
+
+      - name: Terraform Apply (cluster bootstrap — instala/sobe o microk8s)
+        working-directory: infra/cluster
+        run: terraform apply -auto-approve -input=false
+
+      - name: Terraform Init (recursos)
+        run: |
           state_path="$HOME/.local/state/tech-challenge/terraform.tfstate"
           mkdir -p "$(dirname "$state_path")"
           terraform init -input=false -backend-config="path=$state_path"
 
-      - name: Terraform Validate
+      - name: Terraform Validate (recursos)
         run: terraform validate
 
-      - name: Terraform Apply
+      - name: Terraform Apply (recursos)
         run: terraform apply -auto-approve -input=false
 
   # Aplica os manifests Kustomize da app no microk8s usando a tag SHA publicada.

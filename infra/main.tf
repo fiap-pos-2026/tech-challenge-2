@@ -1,13 +1,4 @@
-# Recursos de apoio (namespace, PostgreSQL, Redis, Mailpit) sobre o cluster provisionado em
-# cluster.tf. Sem Helm charts de terceiros: manifests equivalentes via provider kubernetes,
-# usando as mesmas imagens do docker-compose.yml para paridade dev/prd e nomes de Service que
-# casam com JDBC_HOST/REDIS_HOST já esperados por k8s/base/configmap.yaml (`postgres`, `redis`).
-
 resource "kubernetes_namespace" "tech_challenge" {
-  # Garante que o cluster (validado/provisionado por cluster.tf a cada apply) já existe
-  # antes de qualquer recurso kubernetes_* ser aplicado.
-  depends_on = [null_resource.microk8s]
-
   metadata {
     name = var.namespace
   }
@@ -154,8 +145,6 @@ resource "kubernetes_service" "postgres" {
   }
 }
 
-# Redis sem senha — mesmo comportamento do docker-compose.yml (`--save ""`, sem auth);
-# a app hoje não configura spring.data.redis.password.
 resource "kubernetes_deployment" "redis" {
   metadata {
     name      = "redis"
@@ -234,8 +223,6 @@ resource "kubernetes_service" "redis" {
   }
 }
 
-# Mailpit captura os e-mails de OTP e de mudança de status no ambiente local,
-# mantendo o mesmo serviço usado pelo docker-compose.yml.
 resource "kubernetes_deployment" "mailpit" {
   metadata {
     name      = "mailpit"
