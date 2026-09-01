@@ -46,17 +46,14 @@ Os overrides de versão Java são feitos no bloco `dependencyManagement` do `cor
 # Gere a imagem (BuildKit / buildx é necessário pelos cache mounts do Dockerfile)
 docker buildx build -f core/Dockerfile -t tech-challenge-core:local --load .
 
-# Execute o scan e gere os relatórios
+# Execute o scan
 trivy image --scanners vuln --format json \
   --output reports/security/security-report.json tech-challenge-core:local
-
-trivy image --scanners vuln --format template --template "@contrib/html.tpl" \
-  --output reports/security/security-report.html tech-challenge-core:local
 ```
 
 ## Arquivos
 
 | Arquivo | Descrição |
 |---|---|
-| `security-report.json` | Resultado completo em JSON (SchemaVersion 2) |
-| `security-report.html` | Relatório visual em HTML |
+| `security-report.json` | Resultado completo do scan em JSON (SchemaVersion 2) |
+| `security-report.html` | Resumo visual: metadados da imagem e inventário de pacotes analisados (SO e Java) |
