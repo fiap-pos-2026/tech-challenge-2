@@ -1,8 +1,3 @@
-output "cluster_managed_by_terraform" {
-  description = "Sempre true: cluster.tf valida e provisiona (quando ausente) o cluster microk8s a cada apply."
-  value       = true
-}
-
 output "namespace" {
   description = "Namespace provisionado no microk8s."
   value       = kubernetes_namespace.tech_challenge.metadata[0].name

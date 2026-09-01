@@ -9,7 +9,6 @@ import jakarta.validation.ConstraintValidatorContext;
  */
 public class LicensePlateValidator implements ConstraintValidator<ValidLicensePlate, String> {
 
-    // formato antigo: AAA9999 | Mercosul: AAA9A99
     private static final java.util.regex.Pattern PATTERN =
             java.util.regex.Pattern.compile("^[A-Z]{3}[0-9]{4}$|^[A-Z]{3}[0-9][A-Z][0-9]{2}$");
 

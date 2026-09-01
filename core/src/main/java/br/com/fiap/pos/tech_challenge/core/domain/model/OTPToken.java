@@ -26,7 +26,6 @@ public class OTPToken {
 
     private ServiceOrder serviceOrder;
 
-    // SHA-256 hex digest (64 chars)
     private String tokenHash;
 
     private Instant expiresAt;

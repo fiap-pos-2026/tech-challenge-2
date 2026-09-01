@@ -1,16 +1,3 @@
-variable "microk8s_channel" {
-  description = "Canal do snap do microk8s instalado por cluster.tf quando o binário não existe no host."
-  type        = string
-  default     = "1.31/stable"
-}
-
-variable "microk8s_addons" {
-  description = "Addons do microk8s garantidos por cluster.tf a cada apply (idempotente). metrics-server é obrigatório para o HPA (k8s/base/hpa.yaml) calcular utilização de CPU/memória."
-  type        = list(string)
-  # hostpath-storage (não `storage`, que está deprecado e só faz alias para ele).
-  default = ["dns", "hostpath-storage", "metrics-server"]
-}
-
 variable "namespace" {
   description = "Namespace do microk8s onde a app e as dependências de dados são provisionadas."
   type        = string

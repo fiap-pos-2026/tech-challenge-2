@@ -36,7 +36,6 @@ public class OTPTokenEntity {
     @JoinColumn(name = "_service_order_id", nullable = false)
     private ServiceOrderEntity serviceOrder;
 
-    // SHA-256 hex digest (64 chars)
     @Column(name = "_token_hash", nullable = false, length = 64)
     private String tokenHash;
 

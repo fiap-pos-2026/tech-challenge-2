@@ -18,7 +18,6 @@ public class SecurityContextCurrentActorAdapter implements CurrentActorPort {
                 return Optional.of(impl.user());
             }
         } catch (Exception ignored) {
-            // no authenticated actor
         }
         return Optional.empty();
     }

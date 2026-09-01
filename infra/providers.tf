@@ -1,10 +1,5 @@
-# O kubeconfig referenciado abaixo é gerado/atualizado pelo próprio Terraform em cluster.tf
-# (`microk8s config > kubeconfig_path`) antes destes providers serem usados. Para um cluster
-# gerenciado na cloud, substitua cluster.tf e aponte este caminho (e kube_context) para o
-# kubeconfig desse cluster. Ver `infra/README.md`.
-
 variable "kubeconfig_path" {
-  description = "Caminho do kubeconfig do cluster — destino de `microk8s config` em cluster.tf e fonte do provider kubernetes."
+  description = "Caminho do kubeconfig do cluster — gerado por infra/cluster/ e fonte do provider kubernetes."
   type        = string
   default     = "~/.kube/config"
 }

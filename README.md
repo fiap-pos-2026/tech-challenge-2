@@ -291,17 +291,18 @@ Secret `ghcr-pull` (`imagePullSecrets` em `k8s/base/deployment.yaml`), provision
 quando `ghcr_pull_token` é informado:
 
 ```bash
-# 1. Verifique o cluster e habilite os addons necessários
-microk8s status --wait-ready
-microk8s enable dns hostpath-storage metrics-server
-microk8s kubectl get nodes
+# 1. Bootstrap do cluster (instala o microk8s se ausente, sobe, habilita os addons,
+#    escreve o kubeconfig). Rode `sudo -v` antes se o sudo pedir senha.
+cd infra/cluster
+terraform init -backend-config="path=$HOME/.local/state/tech-challenge/cluster.tfstate"
+terraform apply
+cd ..
 
 # 2. Provisione namespace, PostgreSQL, Redis e Mailpit
-cd infra
 cp terraform.tfvars.example terraform.tfvars
 # Edite terraform.tfvars: informe db_password e, para puxar a imagem privada do GHCR,
 # ghcr_pull_token (PAT com escopo read:packages)
-terraform init
+terraform init -backend-config="path=$HOME/.local/state/tech-challenge/terraform.tfstate"
 terraform plan -var-file=terraform.tfvars
 terraform apply -var-file=terraform.tfvars
 cd ..
@@ -346,18 +347,22 @@ Acesse `http://localhost:8025`.
 
 ### Terraform (infraestrutura de apoio)
 
-O diretório `/infra` provisiona, via Terraform, o namespace, PostgreSQL, Redis e
-Mailpit **sobre um microk8s já instalado**. O Terraform não instala o cluster:
+O diretório `/infra` tem dois configs Terraform: `infra/cluster/` faz o bootstrap do microk8s
+(instala se ausente, sobe, habilita addons, escreve o kubeconfig) e `infra/` provisiona
+namespace, PostgreSQL, Redis e Mailpit. Rodam nessa ordem — o config de recursos usa o provider
+`kubernetes`, que precisa de um cluster no ar:
 
 ```bash
-cd infra
-terraform init
+cd infra/cluster
+terraform init -backend-config="path=$HOME/.local/state/tech-challenge/cluster.tfstate"
+terraform apply
+cd ..
+terraform init -backend-config="path=$HOME/.local/state/tech-challenge/terraform.tfstate"
 cp terraform.tfvars.example terraform.tfvars   # defina db_password real
-terraform plan -var-file=terraform.tfvars
 terraform apply -var-file=terraform.tfvars
 ```
 
-Passo a passo completo, variáveis, Secret da aplicação e outputs estão em
+Motivo do split, variáveis, Secret da aplicação e outputs estão em
 [`infra/README.md`](infra/README.md).
 
 ### CI/CD
