@@ -127,7 +127,9 @@ jobs:
 
       - name: Terraform Apply (cluster bootstrap — instala/sobe o microk8s)
         working-directory: infra/cluster
-        run: terraform apply -auto-approve -input=false
+        run: |
+          sed -i 's/\r$//' scripts/setup-microk8s.sh
+          terraform apply -auto-approve -input=false
 
       - name: Terraform Init (recursos)
         run: |
